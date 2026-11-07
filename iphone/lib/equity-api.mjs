@@ -11,7 +11,7 @@ export function createEquityApi({market=new Market(),clock=()=>new Date()}={}){
         if(route==='/api/quote')return json(200,await market.quote(u.searchParams.get('symbol'),{fresh:u.searchParams.get('fresh')==='1'}));
         if(route==='/api/fundamentals')return json(200,await market.fundamentals(u.searchParams.get('symbol'),{fresh:u.searchParams.get('fresh')==='1'}));
         if(route==='/api/chart')return json(200,await market.chart(u.searchParams.get('symbol'),u.searchParams.get('range')||'1D',{fresh:u.searchParams.get('fresh')==='1'}));
-        if(route==='/api/health')return json(200,{app:'e-equity-iphone',version:'1.1.0'});
+        if(route==='/api/health')return json(200,{app:'e-equity-iphone',version:'1.1.1'});
       }
       if(request.method==='POST'&&route==='/api/trade-quote'){
         const origin=request.headers.get('Origin');if(origin&&origin!==u.origin)return json(403,{error:'请从本应用内下单'});

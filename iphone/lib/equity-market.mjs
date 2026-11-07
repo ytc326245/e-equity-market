@@ -57,6 +57,22 @@ function normalizeIntraday(data){
   for(const p of rows){if(byTime.has(p.time)){if(byTime.get(p.time).price!==p.price)throw new Error('同一分时时间存在冲突价格，已停止绘图');duplicates++;}else byTime.set(p.time,p);}
   return {points:[...byTime.values()],sessionDate,session:{start,end,closeTime:sessionStatus.closeTime},timeZone:'America/New_York',timestampEncoding:[...encodings][0]||null,priceType:'provider-chart-sample',diagnostics:{input:(data.chart||[]).length,invalid,outsideSession,wrongDate,duplicates}};
 }
+function normalizeHistorical(data){
+  const rows=data.tradesTable?.rows||[],byTime=new Map(),excluded=new Set();let invalid=0,placeholder=0,invalidOHLC=0,duplicates=0;
+  for(const row of rows){
+    const day=sourceDate(row.date),time=day?Date.parse(`${day}T00:00:00Z`):NaN,price=numeric(row.close);
+    if(!Number.isFinite(time)||!(price>0)){invalid++;if(day)excluded.add(day);continue;}
+    const open=numeric(row.open),high=numeric(row.high),low=numeric(row.low),hasOHLC=['open','high','low'].some(k=>Object.hasOwn(row,k));
+    if(hasOHLC&&(!(open>0)||!(high>0)||!(low>0)||high<low||Math.max(open,price)>high+.005001||Math.min(open,price)<low-.005001)){invalid++;invalidOHLC++;excluded.add(day);continue;}
+    // An all-flat row with explicitly absent/zero volume is a carry-forward placeholder,
+    // not a verified daily close. Do not substitute a previous close or smooth real moves.
+    if(hasOHLC&&open===price&&high===price&&low===price&&Object.hasOwn(row,'volume')&&!(numeric(row.volume)>0)){invalid++;placeholder++;excluded.add(day);continue;}
+    if(byTime.has(time)){if(byTime.get(time).price!==price)throw new Error('同一历史日期存在冲突收盘价，已停止绘图');duplicates++;}
+    else byTime.set(time,{time,price});
+  }
+  const points=[...byTime.values()].sort((a,b)=>a.time-b.time);
+  return {points,excludedDates:[...excluded].filter(d=>!byTime.has(Date.parse(`${d}T00:00:00Z`))).sort(),priceType:'provider-daily-close',diagnostics:{input:rows.length,invalid,placeholder,invalidOHLC,duplicates}};
+}
 class Market {
   constructor({financialFetch=fetch}={}){this.cache=new Map();this.pending=new Map();this.financialData=new YahooFundamentals(financialFetch);}
   info(){return {provider:'Nasdaq 公开行情',coverage:'unverified',verified:false,isRealTime:false,tradingEnabled:true,executionMode:'public-quote',delayMayApply:true,status:'真实报价模拟交易已开放',note:'正常交易时段按公开真实报价模拟成交；行情可能存在延迟，不保证与券商实时价格完全一致。报价时间与读取时间分别标注。',symbols:listing.symbols.length,listingUpdatedAt:listing.updatedAt,source:'https://www.nasdaq.com/market-activity',calendarSource:'https://www.nyse.com/trade/hours-calendars'};}
@@ -71,6 +87,7 @@ class Market {
     if(!response.ok)throw new Error(`行情服务暂不可用（HTTP ${response.status}）`);
     const body=await response.json();
     if(!body.data)throw new Error('该标的暂无可用行情');
+    if(body.data.symbol&&String(body.data.symbol).toUpperCase()!==symbol)throw new Error('行情来源返回了其他标的数据，已停止使用');
     return body.data;
   }
   async cached(key,ttl,fn,fresh=false){
@@ -81,7 +98,7 @@ class Market {
   quote(symbol,{fresh=false}={}){return this.cached(`quote:${symbol}`,15000,async()=>{
     const data=await this.request(symbol,'info'); const p=data.primaryData; const price=numeric(p?.lastSalePrice);
     if(price===null||price<=0)throw new Error('该标的尚无有效报价');
-    return {symbol,price,change:numeric(p.netChange),changePercent:numeric(p.percentageChange),volume:numeric(p.volume),previousClose:numeric(p.netChange)===null?null:price-numeric(p.netChange),timestamp:null,asOf:p.lastTradeTimestamp||'来源未提供',fetchedAt:new Date().toISOString(),provider:'Nasdaq 公开行情',coverage:'unverified',verified:false,isRealTime:p.isRealTime===true,providerMarketStatus:data.marketStatus,tradingStatus:'unknown',source:`https://www.nasdaq.com/market-activity/${this.symbol(symbol).type==='ETF'?'etf':'stocks'}/${symbol.toLowerCase()}`};
+    return {symbol,price,priceType:'last-sale',sessionDate:sourceDate(p.lastTradeTimestamp),change:numeric(p.netChange),changePercent:numeric(p.percentageChange),volume:numeric(p.volume),previousClose:numeric(p.netChange)===null?null:price-numeric(p.netChange),timestamp:null,asOf:p.lastTradeTimestamp||'来源未提供',fetchedAt:new Date().toISOString(),provider:'Nasdaq 公开行情',coverage:'unverified',verified:false,isRealTime:p.isRealTime===true,providerMarketStatus:data.marketStatus,tradingStatus:'unknown',source:`https://www.nasdaq.com/market-activity/${this.symbol(symbol).type==='ETF'?'etf':'stocks'}/${symbol.toLowerCase()}`};
   },fresh);}
   fundamentals(symbol,{fresh=false}={}){
     const security=this.symbol(symbol);if(!validSymbol(symbol)||!security)return Promise.reject(new Error('股票不在当前上市目录中'));
@@ -100,7 +117,7 @@ class Market {
     }else{
       const from=new Date();from.setUTCDate(from.getUTCDate()-({ '1M':32,'3M':94,'1Y':368}[range]));
       const data=await this.request(symbol,`historical?fromdate=${from.toISOString().slice(0,10)}&limit=400`);asOf=data.tradesTable?.asOf||'';
-      points=(data.tradesTable?.rows||[]).map(p=>({time:Date.parse(`${sourceDate(p.date)}T00:00:00Z`),price:numeric(p.close)})).filter(p=>Number.isFinite(p.time)&&p.price>0).sort((a,b)=>a.time-b.time);
+      details=normalizeHistorical(data);points=details.points;
     }
     return {symbol,range,points,asOf,...details,fetchedAt:new Date().toISOString(),provider:'Nasdaq 公开行情',verified:false};
   },fresh);}

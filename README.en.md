@@ -13,7 +13,7 @@ A Chinese-first US stock and ETF paper-trading app for beginners to learn basic 
 - Configurable virtual capital, fractional shares, watchlists, holdings and transaction history.
 - Intraday samples and historical close charts, with provider time and fetch time shown separately.
 - Core financial metrics with expandable details, provider/period labels and explicit missing-data states.
-- ETF-specific assets/expense ratios, a four-step beginner guide and order-entry tips.
+- ETF asset statistics with explicit provider scope and expense ratios, a four-step beginner guide and order-entry tips.
 - New York trading dates, DST, holidays and early closes for 2026–2028.
 - JSON account backup/restore and CSV transaction export.
 - No brokerage account or API key required for the current public-quote adapter.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 — 2026-11-08
+
+- Audit 22 starter symbols against Yahoo Finance and TradingView, including daily/intraday histories for AAPL, MSFT and SPY.
+- Read ETF fees from fundProfile, preserve fractional-cent price/fee precision, restore quote-currency ADR EPS and map class-share Yahoo symbols.
+- Reject mismatched provider symbols and known quotes from another New York trading date.
+- Leave gaps for unverifiable historical carry-forward placeholders; retain genuine sharp moves.
+- Guard quote refresh races, preserve missing percentage changes, retry incomplete financial snapshots after 30 seconds and reload full quote metadata after fills.
+- Clarify source last-sale, volume and multi-share-class fund-asset semantics. Mobile runtime is 1.1.1.
+
 ## 0.3.0 — 2026-11-08
 
 - Add independent Yahoo/Nasdaq financial snapshots: PE/EPS (TTM), market cap, PB, dividend yield and 52-week range.

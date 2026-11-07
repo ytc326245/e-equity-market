@@ -3,12 +3,15 @@ const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=v=>v===null||v===undefined||!Number.isFinite(v)?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+const priceUsd=v=>v===null||v===undefined||!Number.isFinite(v)?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:6}).format(v);
+const priceChange=v=>`${v>0?'+':''}${new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:6}).format(v)}`;
 const num=(v,d=6)=>Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
 const signed=v=>`${v>0?'+':''}${v.toFixed(2)}`;
 const color=v=>v>0?'positive':v<0?'negative':'muted';
 const date=v=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('zh-CN',{hour12:false}):'—';
 let state=null,symbol='AAPL',security={symbol:'AAPL',name:'Apple Inc.',type:'STOCK'},range='1D',side='buy',page='terminal',selection=0,searchRevision=0,searchTimer,toastTimer,confirmation=null,refreshing=false,submitting=false,serverOffset=0;
 const quotes=new Map(),quoteErrors=new Map(),metadata=new Map();
+const quoteRevisions=new Map();
 const fundamentals=new Map(),fundamentalErrors=new Map(),fundamentalLoading=new Set(),fundamentalRevisions=new Map();
 let guideStep=0,fundamentalsDetailStamp='';
 const learningKey='e-equity.learning.v1';
@@ -20,7 +23,7 @@ const metricDefinitions={
   dividendYield:{label:'股息率',unit:'%',explanation:'现金股息或基金分配相对价格的比例。公司优先使用 Yahoo 预期年度股息率，缺失时使用 Nasdaq Current Yield；基金使用来源的分配收益率。请查看下方口径。股息会调整，这不是承诺收益。'},
   week52High:{label:'52 周最高价',unit:'USD',explanation:'来源记录的过去 52 周最高交易价，不是当天最高价，也不代表未来价格上限。复权与价格覆盖范围不同可能造成平台差异。'},
   week52Low:{label:'52 周最低价',unit:'USD',explanation:'来源记录的过去 52 周最低交易价，不是当天最低价，也不代表未来价格下限。'},
-  aum:{label:'基金资产规模',unit:'USD',explanation:'ETF 管理的资产总额（AUM），用于了解基金规模，不等同于普通公司的总市值。Nasdaq 标注为千美元时，软件会转换为美元。'},
+  aum:{label:'基金资产（来源口径）',unit:'USD',explanation:'来源公布的基金资产资料，基准日期可能未提供。部分基金有多类份额，数值可能包含其他份额类别，不能直接当作当前 ETF 份额的实时资产规模。Nasdaq 标注为千美元时，软件转换为美元。'},
   expenseRatio:{label:'基金年费率',unit:'%',explanation:'基金每年运营费用占资产的比例，通常已在基金净值中体现，不是每次买卖收取的手续费。本软件不会另行模拟扣除基金费用。'}
 };
 const guideSteps=[
@@ -57,7 +60,7 @@ function renderState(){
 function renderWatchlist(){
   if(!state)return;
   $('#watch-items').innerHTML=state.account.watchlist.length?state.account.watchlist.map(s=>{
-    const q=quotes.get(s),m=metadata.get(s),error=quoteErrors.get(s);return `<button class="watch-item ${symbol===s?'selected':''}" data-symbol="${escapeHtml(s)}" aria-label="查看 ${escapeHtml(s)} 行情"><div><strong>${escapeHtml(s)}</strong><small>${escapeHtml(m?.alias||m?.name||'股票 / ETF')}</small></div><div class="watch-price">${q?usd(q.price):'—'}<small class="${q?color(q.changePercent):'muted'}">${q&&q.changePercent!==null?signed(q.changePercent)+'%':error?'暂无报价':'读取中…'}</small></div></button>`;
+    const q=quotes.get(s),m=metadata.get(s),error=quoteErrors.get(s);return `<button class="watch-item ${symbol===s?'selected':''}" data-symbol="${escapeHtml(s)}" aria-label="查看 ${escapeHtml(s)} 行情"><div><strong>${escapeHtml(s)}</strong><small>${escapeHtml(m?.alias||m?.name||'股票 / ETF')}</small></div><div class="watch-price">${q?priceUsd(q.price):'—'}<small class="${q?color(q.changePercent):'muted'}">${q&&q.changePercent!==null?signed(q.changePercent)+'%':error?'暂无报价':'读取中…'}</small></div></button>`;
   }).join(''):'<div class="empty-state"><h3>添加你的第一个自选</h3><p>点击上方 ＋ 搜索股票或 ETF</p></div>';
   $('#toggle-watch').textContent=state.account.watchlist.includes(symbol)?'★':'☆';
   $('#toggle-watch').setAttribute('aria-label',state.account.watchlist.includes(symbol)?'移除自选':'添加自选');
@@ -67,12 +70,12 @@ function renderPositions(){
   if(!state)return;const entries=Object.entries(state.account.positions);
   let html;
   if(!entries.length)html=empty('留一点空间，给你的第一笔投资。',state.account.initialCents===null?'先设定本金，再探索你感兴趣的股票和 ETF。':'持仓会在首笔模拟买入成交后显示。',state.account.initialCents===null?'<button class="button" data-open-capital>设置虚拟本金 ↗</button>':'<button class="secondary-button" data-search>探索股票 ↗</button>');
-  else html=`<div class="table-wrap"><table><thead><tr><th>股票代码</th><th>持有股数</th><th>平均成本</th><th>参考价格</th><th>估算市值</th><th>浮动盈亏</th></tr></thead><tbody>${entries.map(([s,p])=>{const qty=Number(p.quantityMicros)/1e6,q=quotes.get(s),value=q?q.price*qty:null,pnl=value===null?null:value-p.costCents/100;return `<tr class="clickable" data-symbol="${escapeHtml(s)}"><td>${escapeHtml(s)}</td><td>${num(qty)}</td><td>${usd(p.costCents/100/qty)}</td><td>${q?usd(q.price):'—'}</td><td>${usd(value)}</td><td class="${pnl===null?'muted':color(pnl)}">${usd(pnl)}</td></tr>`;}).join('')}</tbody></table></div>`;
+  else html=`<div class="table-wrap"><table><thead><tr><th>股票代码</th><th>持有股数</th><th>平均成本</th><th>参考价格</th><th>估算市值</th><th>浮动盈亏</th></tr></thead><tbody>${entries.map(([s,p])=>{const qty=Number(p.quantityMicros)/1e6,q=quotes.get(s),value=q?q.price*qty:null,pnl=value===null?null:value-p.costCents/100;return `<tr class="clickable" data-symbol="${escapeHtml(s)}"><td>${escapeHtml(s)}</td><td>${num(qty)}</td><td>${priceUsd(p.costCents/100/qty)}</td><td>${q?priceUsd(q.price):'—'}</td><td>${usd(value)}</td><td class="${pnl===null?'muted':color(pnl)}">${usd(pnl)}</td></tr>`;}).join('')}</tbody></table></div>`;
   $('#positions-table').innerHTML=html;$('#holdings-preview').innerHTML=html;
 }
 function renderHistory(){
   if(!state)return;const trades=state.account.trades;
-  $('#history-table').innerHTML=trades.length?`<div class="table-wrap"><table><thead><tr><th>模拟成交时间（本机时区）</th><th>代码</th><th>方向</th><th>股数</th><th>成交价</th><th>金额</th><th>报价时间（来源）</th><th>读取时间（本机时区）</th></tr></thead><tbody>${trades.slice().reverse().map(t=>`<tr><td>${escapeHtml(date(t.timestamp))}</td><td>${escapeHtml(t.symbol)}</td><td class="${t.side==='buy'?'positive':'negative'}">${t.side==='buy'?'买入':'卖出'}</td><td>${num(t.quantity)}</td><td>${usd(t.price)}</td><td>${usd(t.amountCents/100)}</td><td>${escapeHtml(t.quoteAsOf||t.quoteTime||'来源未提供')}</td><td>${escapeHtml(date(t.quoteFetchedAt))}</td></tr>`).join('')}</tbody></table></div>`:empty('交易记录，从一次决策开始。','成交后的每笔买卖都会保存在这里。');
+  $('#history-table').innerHTML=trades.length?`<div class="table-wrap"><table><thead><tr><th>模拟成交时间（本机时区）</th><th>代码</th><th>方向</th><th>股数</th><th>成交价</th><th>金额</th><th>报价时间（来源）</th><th>读取时间（本机时区）</th></tr></thead><tbody>${trades.slice().reverse().map(t=>`<tr><td>${escapeHtml(date(t.timestamp))}</td><td>${escapeHtml(t.symbol)}</td><td class="${t.side==='buy'?'positive':'negative'}">${t.side==='buy'?'买入':'卖出'}</td><td>${num(t.quantity)}</td><td>${priceUsd(t.price)}</td><td>${usd(t.amountCents/100)}</td><td>${escapeHtml(t.quoteAsOf||t.quoteTime||'来源未提供')}</td><td>${escapeHtml(date(t.quoteFetchedAt))}</td></tr>`).join('')}</tbody></table></div>`:empty('交易记录，从一次决策开始。','成交后的每笔买卖都会保存在这里。');
 }
 function tradingBlock(){
   if(!state)return '正在检查交易条件…';
@@ -82,7 +85,7 @@ function tradingBlock(){
 }
 function renderOrder(){
   $('#order-symbol').textContent=symbol;const q=quotes.get(symbol),mode=$('#order-mode').value,v=Number($('#order-value').value);
-  $('#order-price').textContent=q?usd(q.price):'—';$('#order-unit').textContent=mode==='amount'?'USD':'股';$('#order-value-label').textContent=`${side==='buy'?'买入':'卖出'}${mode==='amount'?'金额':'股数'}`;$('#estimate-label').textContent=mode==='amount'?'预计股数':'预计金额';
+  $('#order-price').textContent=q?priceUsd(q.price):'—';$('#order-unit').textContent=mode==='amount'?'USD':'股';$('#order-value-label').textContent=`${side==='buy'?'买入':'卖出'}${mode==='amount'?'金额':'股数'}`;$('#estimate-label').textContent=mode==='amount'?'预计股数':'预计金额';
   $('#estimate').textContent=q&&v>0&&Number.isFinite(v)?mode==='amount'?num(Math.floor(v/q.price*1e6)/1e6)+' 股':usd(v*q.price):'—';
   const block=tradingBlock();$('#order-status').textContent=block||'按公开真实报价模拟成交，行情可能延迟；提交时会重新读取价格。';$('#submit-order').disabled=!!block||!(v>0)||!Number.isFinite(v)||submitting;$('#submit-order').textContent=submitting?'正在处理…':block?(state?.account.initialCents===null?'请先设置本金':!state?.market.isOpen?'休市中，暂不能交易':'等待有效报价'):`确认${side==='buy'?'买入':'卖出'} ${symbol}`;
   $('#order-tip').textContent=side==='sell'?'卖出只能使用已有持仓，不能卖空。金额和股数可以切换，预计结果会随报价变化。':mode==='amount'?'按金额：输入想使用的虚拟美元，软件估算可买股数；支持不足一整股。提交时会重新读取价格。':'按股数：输入想买的股数，支持最多 6 位小数。预计金额随报价变化，请留意可用资金。';
@@ -91,15 +94,15 @@ function renderQuote(){
   const q=quotes.get(symbol),err=quoteErrors.get(symbol);$('#ticker-logo').textContent=symbol.slice(0,1);
   $('#ticker-symbol').innerHTML=`${escapeHtml(symbol)} <span class="instrument-tag">${security.type==='ETF'?'ETF':'STOCK'}</span>`;
   $('#ticker-name').textContent=security.alias?`${security.alias} · ${security.name}`:security.name;
-  $('#quote-price').textContent=q?usd(q.price):'—';$('#quote-change').textContent=q&&q.change!==null?`${signed(q.change)} (${signed(q.changePercent??0)}%)`:err?'暂无可用报价':'正在读取报价';$('#quote-change').className='quote-change '+(q?color(q.change):'muted');
-  $('#quote-meta').textContent=q?`来源：${q.provider} · 报价时间（来源）：${q.asOf} · 读取：${date(q.fetchedAt)} · 可能延迟`:err||'来源：Nasdaq 公开行情';
-  $('#stat-close').textContent=q?usd(q.previousClose):'—';$('#stat-volume').textContent=q&&q.volume!==null?num(q.volume,0):'—';renderFundamentals();renderOrder();
+  $('#quote-price').textContent=q?priceUsd(q.price):'—';$('#quote-change').textContent=q&&q.change!==null?`${priceChange(q.change)} (${q.changePercent===null?'—':signed(q.changePercent)+'%'})`:err?'暂无可用报价':'正在读取报价';$('#quote-change').className='quote-change '+(q?color(q.change):'muted');
+  $('#quote-meta').textContent=q?`来源：${q.provider} · 来源最近成交价 · 报价时间（来源）：${q.asOf} · 读取：${date(q.fetchedAt)} · 可能延迟`:err||'来源：Nasdaq 公开行情';
+  $('#stat-close').textContent=q?priceUsd(q.previousClose):'—';$('#stat-volume').textContent=q&&q.volume!==null?num(q.volume,0):'—';renderFundamentals();renderOrder();
 }
 function metricValue(key,metric){
   if(!metric||metric.value===null||!Number.isFinite(metric.value))return metric?.status==='not-applicable'?'不适用':metric?.status==='not-meaningful'?'不具比较意义':'—';
   const value=metric.value;
   if(['marketCap','aum'].includes(key))return value>=1e12?`${num(value/1e12,2)} 万亿美元`:value>=1e8?`${num(value/1e8,2)} 亿美元`:usd(value);
-  return metricDefinitions[key].unit==='USD'?usd(value):`${num(value,2)}${metricDefinitions[key].unit}`;
+  return metricDefinitions[key].unit==='USD'?(['week52High','week52Low'].includes(key)?priceUsd(value):usd(value)):`${num(value,key==='expenseRatio'?4:2)}${metricDefinitions[key].unit}`;
 }
 function renderFundamentals(){
   const data=fundamentals.get(symbol),etf=security.type==='ETF',loading=fundamentalLoading.has(symbol);
@@ -135,7 +138,7 @@ function renderGuide(){
   const step=guideSteps[guideStep];$('#guide-progress').textContent=`${guideStep+1} / ${guideSteps.length}`;$('#guide-title').textContent=step.title;$('#guide-text').textContent=step.text;$('#guide-action').textContent=step.button;$('#guide-action').dataset.guideAction=step.action;$('#guide-back').disabled=guideStep===0;$('#guide-next').textContent=guideStep===guideSteps.length-1?'完成引导':'下一步';
 }
 function openGuide(){guideStep=0;renderGuide();showDialog('guide-dialog');}
-async function getQuote(s,{fresh=false}={}){try{const q=await api('/api/quote?symbol='+encodeURIComponent(s)+(fresh?'&fresh=1':''));quotes.set(s,q);quoteErrors.delete(s);}catch(e){quotes.delete(s);quoteErrors.set(s,e.message);}renderWatchlist();renderPositions();if(s===symbol)renderQuote();}
+async function getQuote(s,{fresh=false}={}){const revision=(quoteRevisions.get(s)||0)+1;quoteRevisions.set(s,revision);try{const q=await api('/api/quote?symbol='+encodeURIComponent(s)+(fresh?'&fresh=1':''));if(quoteRevisions.get(s)!==revision)return;if(q.symbol!==s||!Number.isFinite(q.price)||q.price<=0)throw new Error('报价内容无效或标的不匹配');quotes.set(s,q);quoteErrors.delete(s);}catch(e){if(quoteRevisions.get(s)!==revision)return;quotes.delete(s);quoteErrors.set(s,e.message);}renderWatchlist();renderPositions();if(s===symbol)renderQuote();}
 async function selectSymbol(s){
   symbol=s;const revision=++selection;setPage('terminal');range=range||'1D';
   security=metadata.get(s)||{symbol:s,name:'正在读取名称…',type:'STOCK'};renderQuote();renderWatchlist();
@@ -150,22 +153,23 @@ async function loadChart({fresh=false}={}){
   catch(e){if(revision===chartRevision&&symbol===target&&range===targetRange)$('#chart-container').innerHTML=`<div class="chart-empty">${escapeHtml(e.message)}<br>可以稍后切换区间重试。</div>`;}
 }
 function drawChart(data){
-  const points=data.points;$('#chart-date').textContent=data.range==='1D'?`${data.sessionDate||data.asOf||'最近交易日'} · 纽约时间 · 分时采样`:'历史收盘价 · USD';
+  const points=data.points;$('#chart-date').textContent=data.range==='1D'?`${data.sessionDate||data.asOf||'最近交易日'} · 纽约时间 · 分时采样`:`历史收盘价 · USD${data.diagnostics?.invalid?` · 已排除 ${data.diagnostics.invalid} 条不可核验日线（留空）`:''}`;
   if(points.length<2){$('#chart-container').innerHTML='<div class="chart-empty">这个区间暂无足够的真实行情数据。</div>';return;}
   const width=700,height=280,left=3,right=60,top=12,bottom=27,w=width-left-right,h=height-top-bottom;
   const values=points.map(p=>p.price);let min=Math.min(...values),max=Math.max(...values);const spread=Math.max(max-min,max*.001);min-=spread*.12;max+=spread*.12;
   const start=data.session?.start??points[0].time,end=data.session?.end??points.at(-1).time;
   const xt=t=>left+(t-start)/(end-start)*w,x=i=>xt(points[i].time),y=p=>top+(max-p)/(max-min)*h;
-  const segments=[];for(const p of points){if(!segments.length||(data.range==='1D'&&p.time-segments.at(-1).at(-1).time>90000))segments.push([]);segments.at(-1).push(p);}
+  const excluded=(data.excludedDates||[]).map(d=>Date.parse(`${d}T00:00:00Z`));
+  const segments=[];for(const p of points){const previous=segments.at(-1)?.at(-1);if(!previous||(data.range==='1D'?p.time-previous.time>90000:excluded.some(t=>t>previous.time&&t<p.time)))segments.push([]);segments.at(-1).push(p);}
   const pathFor=segment=>segment.map((p,i)=>`${i?'L':'M'}${xt(p.time).toFixed(2)},${y(p.price).toFixed(2)}`).join(' ');
   const line=segments.map(pathFor).join(' ');
   const area=segments.map(s=>pathFor(s)+` L${xt(s.at(-1).time)},${top+h} L${xt(s[0].time)},${top+h} Z`).join(' ');
   const trend=points.at(-1).price>=points[0].price?'#b8a5ff':'#d49abb';
-  const grid=[0,1,2,3,4].map(i=>{const pos=top+h*i/4,price=max-(max-min)*i/4;return `<line class="chart-grid" x1="0" x2="${w}" y1="${pos}" y2="${pos}"/><text class="chart-label" x="${w+14}" y="${pos+4}">${price.toFixed(2)}</text>`;}).join('');
+  const grid=[0,1,2,3,4].map(i=>{const pos=top+h*i/4,price=max-(max-min)*i/4;return `<line class="chart-grid" x1="0" x2="${w}" y1="${pos}" y2="${pos}"/><text class="chart-label" x="${w+14}" y="${pos+4}">${price.toFixed(Math.max(2,Math.min(6,2-Math.floor(Math.log10(spread)))))}</text>`;}).join('');
   const label=t=>data.range==='1D'?new Date(t).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}):new Date(t).toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit',timeZone:'UTC'});
   const ticks=[0,.25,.5,.75,1].map(p=>{const t=start+(end-start)*p;return `<text class="chart-label" text-anchor="${p===0?'start':p===1?'end':'middle'}" x="${xt(t)}" y="${height-3}">${label(t)}</text>`;}).join('');
   $('#chart-container').innerHTML=`<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(symbol)} ${data.range} 真实价格走势图"><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${trend}" stop-opacity="0.23"/><stop offset="100%" stop-color="${trend}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#chart-fill)"/><path d="${line}" fill="none" stroke="${trend}" stroke-width="1.8" vector-effect="non-scaling-stroke"/>${ticks}<g id="chart-cursor" visibility="hidden"><line id="cursor-line" x1="0" x2="0" y1="${top}" y2="${top+h}" stroke="#a89bc6" stroke-dasharray="3 4"/><circle id="cursor-dot" r="4" fill="#d5c8ff" stroke="#171c2a" stroke-width="2"/></g></svg><div class="chart-tooltip" id="chart-tooltip" hidden></div>`;
-  const svg=$('#chart-container svg');svg.addEventListener('pointermove',event=>{const r=svg.getBoundingClientRect(),px=(event.clientX-r.left)/r.width*width,targetTime=start+(px-left)/w*(end-start);let lo=0,hi=points.length-1;while(lo<hi){const mid=Math.floor((lo+hi)/2);if(points[mid].time<targetTime)lo=mid+1;else hi=mid;}const i=lo>0&&Math.abs(points[lo-1].time-targetTime)<Math.abs(points[lo].time-targetTime)?lo-1:lo;const p=points[i];$('#chart-cursor').setAttribute('visibility','visible');$('#cursor-line').setAttribute('x1',x(i));$('#cursor-line').setAttribute('x2',x(i));$('#cursor-dot').setAttribute('cx',x(i));$('#cursor-dot').setAttribute('cy',y(p.price));$('#chart-tooltip').textContent=`${label(p.time)} · ${usd(p.price)}${data.range==='1D'?' ET':''}`;$('#chart-tooltip').hidden=false;});svg.addEventListener('pointerleave',()=>{$('#chart-cursor').setAttribute('visibility','hidden');$('#chart-tooltip').hidden=true;});
+  const svg=$('#chart-container svg');svg.addEventListener('pointermove',event=>{const r=svg.getBoundingClientRect(),px=(event.clientX-r.left)/r.width*width,targetTime=start+(px-left)/w*(end-start);let lo=0,hi=points.length-1;while(lo<hi){const mid=Math.floor((lo+hi)/2);if(points[mid].time<targetTime)lo=mid+1;else hi=mid;}const i=lo>0&&Math.abs(points[lo-1].time-targetTime)<Math.abs(points[lo].time-targetTime)?lo-1:lo;const p=points[i];$('#chart-cursor').setAttribute('visibility','visible');$('#cursor-line').setAttribute('x1',x(i));$('#cursor-line').setAttribute('x2',x(i));$('#cursor-dot').setAttribute('cx',x(i));$('#cursor-dot').setAttribute('cy',y(p.price));$('#chart-tooltip').textContent=`${label(p.time)} · ${priceUsd(p.price)}${data.range==='1D'?' ET':''}`;$('#chart-tooltip').hidden=false;});svg.addEventListener('pointerleave',()=>{$('#chart-cursor').setAttribute('visibility','hidden');$('#chart-tooltip').hidden=true;});
 }
 async function search(){const rev=++searchRevision,q=$('#search-input').value;try{const result=await api('/api/search?q='+encodeURIComponent(q));if(rev!==searchRevision)return;result.results.forEach(m=>metadata.set(m.symbol,m));$('#search-results').innerHTML=result.results.length?result.results.map(m=>`<button class="search-result" data-search-symbol="${escapeHtml(m.symbol)}"><strong>${escapeHtml(m.symbol)}</strong><span class="result-name">${escapeHtml(m.alias?m.alias+' · '+m.name:m.name)}</span><small>${m.type==='ETF'?'ETF':'股票'}</small></button>`).join(''):empty('没有找到匹配标的','试试股票代码或英文公司名。');}catch(e){toast(e.message);}}
 function openSearch(){showDialog('search-dialog');$('#search-input').focus();search();}
@@ -197,7 +201,7 @@ $('#search-input').addEventListener('input',()=>{clearTimeout(searchTimer);searc
 $('#order-mode').addEventListener('change',()=>{$('#order-value').value='';renderOrder();});$('#order-value').addEventListener('input',renderOrder);
 $('#toggle-watch').onclick=async()=>{if(!state)return;try{const remove=state.account.watchlist.includes(symbol);await api('/api/watchlist',{symbol,remove});await loadState();toast(remove?'已从自选移除':'已加入自选');}catch(e){toast(e.message);}};
 $('#capital-form').addEventListener('submit',async event=>{event.preventDefault();const capital=$('#capital-value').value;const button=event.submitter;button.disabled=true;try{await api('/api/account/reset',{capital,confirm:true});closeDialog('capital-dialog');await loadState();toast('本金已设置，账户已开始新的一轮');}catch(e){toast(e.message);}finally{button.disabled=false;}});
-$('#order-form').addEventListener('submit',event=>{event.preventDefault();if(tradingBlock()||submitting)return;const input={symbol,side,mode:$('#order-mode').value,value:$('#order-value').value,requestId:EquityMobileAPI.id()};confirmAction(`确认${side==='buy'?'买入':'卖出'} ${symbol}`,'将重新读取公开真实报价并立即模拟成交。行情可能延迟，实际成交价以本次读取的报价为准。',async()=>{submitting=true;renderOrder();try{const result=await api('/api/trade',input);const old=quotes.get(input.symbol);if(old)quotes.set(input.symbol,{...old,price:result.price,fetchedAt:result.quoteFetchedAt,asOf:result.quoteAsOf});$('#order-value').value='';await loadState();toast(`已模拟成交 ${num(result.quantity)} 股 ${result.symbol}，价格 ${usd(result.price)}`);}catch(e){toast(e.message);}finally{submitting=false;renderOrder();}});});
+$('#order-form').addEventListener('submit',event=>{event.preventDefault();if(tradingBlock()||submitting)return;const input={symbol,side,mode:$('#order-mode').value,value:$('#order-value').value,requestId:EquityMobileAPI.id()};confirmAction(`确认${side==='buy'?'买入':'卖出'} ${symbol}`,'将重新读取公开真实报价并立即模拟成交。行情可能延迟，实际成交价以本次读取的报价为准。',async()=>{submitting=true;renderOrder();try{const result=await api('/api/trade',input);quoteRevisions.set(input.symbol,(quoteRevisions.get(input.symbol)||0)+1);$('#order-value').value='';await loadState();await getQuote(input.symbol,{fresh:true});renderState();toast(`已模拟成交 ${num(result.quantity)} 股 ${result.symbol}，价格 ${priceUsd(result.price)}`);}catch(e){toast(e.message);}finally{submitting=false;renderOrder();}});});
 $('#confirm-action').onclick=async()=>{const action=confirmation;confirmation=null;closeDialog('confirm-dialog');if(action)await action();};
 $('#confirm-dialog').addEventListener('cancel',()=>confirmation=null);
 $('#import-open').onclick=()=>$('#import-file').click();
@@ -205,7 +209,7 @@ $('#import-file').addEventListener('change',async()=>{const file=$('#import-file
 document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();if(!$$('dialog').some(d=>d.open))openSearch();}if(event.key==='F1'){event.preventDefault();if(!$$('dialog').some(d=>d.open))showDialog('help-dialog');}});
 async function refreshQuotes(){
   if(!state||refreshing)return;refreshing=true;
-  try{const symbols=[...new Set([symbol,...state.account.watchlist,...Object.keys(state.account.positions)])];for(let i=0;i<symbols.length;i+=3)await Promise.allSettled(symbols.slice(i,i+3).map(getQuote));renderState();if(!fundamentalLoading.has(symbol)&&Date.now()-Date.parse(fundamentals.get(symbol)?.fetchedAt||0)>300000)loadFundamentals(symbol);}finally{refreshing=false;}
+  try{const symbols=[...new Set([symbol,...state.account.watchlist,...Object.keys(state.account.positions)])];for(let i=0;i<symbols.length;i+=3)await Promise.allSettled(symbols.slice(i,i+3).map(getQuote));renderState();if(!fundamentalLoading.has(symbol)&&Date.now()-(Date.parse(fundamentals.get(symbol)?.fetchedAt)||0)>(fundamentals.get(symbol)?.status==='available'?300000:30000))loadFundamentals(symbol);}finally{refreshing=false;}
 }
 async function boot(){$('#learning-card').hidden=learningSaved();try{await loadState();const results=await api('/api/search');results.results.forEach(m=>metadata.set(m.symbol,m));await selectSymbol(symbol);await refreshQuotes();}catch(e){toast(e.message);$('#market-label').textContent='本机服务未连接';$('#quote-meta').textContent=e.message;}}
 let lastQuoteRefresh=0;

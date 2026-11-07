@@ -13,15 +13,16 @@ test('financial snapshots retain provider TTM ratios, currencies, dates and perc
   assert.equal(r.sources[1].financialPeriod,'2026-09-30');assert.equal(r.sources[1].quoteAsOf,'2026-11-06T21:00:00.000Z');
   assert.equal(r.metrics.marketCap.provider,'Yahoo Finance');
 });
-test('missing values are never zero; losses, nonpositive book value and currency ambiguity are explicit',()=>{
+test('missing values are never zero; losses and quote currency are explicit without confusing ADR statement currency',()=>{
   const d=fixture();d.defaultKeyStatistics.trailingEps=n(-2);d.defaultKeyStatistics.bookValue=n(-5);
   let r=normalizeFundamentals('AAPL','STOCK',d,null);assert.equal(r.metrics.eps.value,-2);assert.equal(r.metrics.pe.value,null);assert.equal(r.metrics.pe.status,'not-meaningful');assert.equal(r.metrics.pb.value,null);
-  d.financialData.financialCurrency='CNY';r=normalizeFundamentals('AAPL','STOCK',d,null);assert.equal(r.metrics.eps.value,null);assert.match(r.metrics.eps.reason,/货币/);
+  d.financialData.financialCurrency='CNY';r=normalizeFundamentals('AAPL','STOCK',d,null);assert.equal(r.metrics.eps.value,-2);assert.match(r.metrics.eps.period,/CNY/);
+  d.price.currency='EUR';r=normalizeFundamentals('AAPL','STOCK',d,null);assert.equal(r.metrics.eps.value,null);assert.match(r.metrics.eps.reason,/币种/);
   r=normalizeFundamentals('AAPL','STOCK',null,{summaryData:{Yield:{value:'N/A'},MarketCap:{value:'--'},FiftTwoWeekHighLow:{value:'$80/$120'}}});
   assert.equal(r.status,'unavailable');assert.equal(r.metrics.marketCap.value,null);assert.equal(r.metrics.dividendYield.value,null);assert.equal(r.metrics.week52High.value,null);
 });
 test('ETF company ratios are not applicable; fund AUM thousands and fees are converted correctly',()=>{
-  const d=fixture('SPY');d.price.quoteType='ETF';d.summaryDetail.yield=n(.01);
+  const d=fixture('SPY');d.price.quoteType='ETF';d.summaryDetail.yield=n(.01);d.fundProfile={feesExpensesInvestment:{annualReportExpenseRatio:n(.0009)}};
   const r=normalizeFundamentals('SPY','ETF',d,{summaryData:{AUM:{label:'Assets Under Management (,000)',value:'1,234,000'},ExpenseRatio:{value:'0.09%'}}});
   assert.equal(r.status,'available');assert.equal(r.metrics.aum.value,1234000000);assert.equal(r.metrics.expenseRatio.value,.09);assert.equal(r.metrics.dividendYield.value,1);
   for(const k of ['pe','eps','pb','marketCap']){assert.equal(r.metrics[k].value,null);assert.equal(r.metrics[k].status,'not-applicable');}

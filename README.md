@@ -2,7 +2,7 @@
 
 中文美股与 ETF 模拟交易工具（新手向，支持买入、卖出等基础操作，包含 PE、EPS 等常用指标、指标解释与入门引导），支持 Windows 和 iPhone，本地保存账户。Chinese-first US stock and ETF paper trading.
 
-[English](README.en.md) · [使用说明](使用说明.md) · [贡献指南](CONTRIBUTING.md) · [MIT 许可证](LICENSE)
+[本次调试与核对报告](docs/DEBUG_AUDIT_2026-11-08.md) · [English](README.en.md) · [使用说明](使用说明.md) · [贡献指南](CONTRIBUTING.md) · [MIT 许可证](LICENSE)
 
 ![Windows 交易工作台，使用明确标记的演示行情](docs/screenshots/desktop.png)
 
@@ -13,7 +13,7 @@
 - 自设虚拟本金、买入/卖出、小数股、自选、持仓与盈亏。
 - 分时和历史收盘价图表，显示行情来源时间与读取时间。
 - PE、EPS（TTM）、市值、PB、股息率与 52 周高低价；核心指标速览，点开查看来源、期间和解释。
-- ETF 单独展示基金资产规模、年费率与分配收益率。
+- ETF 单独展示来源口径的基金资产、年费率与分配收益率。
 - 四步新手入门、买卖操作提示；可收起，也可在账户设置重新打开。
 - 按纽约交易日期处理正常交易时段、夏令时、节假日和提前收盘。
 - 账户保存在设备上；通过 JSON 备份转移，交易记录可导出 CSV。
