@@ -1,0 +1,139 @@
+{
+  "updatedAt": "2026-11-07T00:00:00.000Z",
+  "note": "Manually maintained starter directory; use npm run symbols:update to fetch a current directory. Not a quote dataset.",
+  "sources": [],
+  "symbols": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "BABA",
+      "name": "Alibaba Group",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "COIN",
+      "name": "Coinbase",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "DIA",
+      "name": "SPDR Dow Jones Industrial Average ETF Trust",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "GLD",
+      "name": "SPDR Gold Shares",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "JD",
+      "name": "JD.com",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "LI",
+      "name": "Li Auto",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "NIO",
+      "name": "NIO",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "PDD",
+      "name": "PDD Holdings",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "QQQ",
+      "name": "Invesco QQQ Trust",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "SPY",
+      "name": "SPDR S&P 500 ETF Trust",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "type": "STOCK",
+      "exchange": "US"
+    },
+    {
+      "symbol": "VOO",
+      "name": "Vanguard S&P 500 ETF",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "type": "ETF",
+      "exchange": "US"
+    },
+    {
+      "symbol": "XPEV",
+      "name": "XPeng",
+      "type": "STOCK",
+      "exchange": "US"
+    }
+  ]
+}

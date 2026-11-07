@@ -1,0 +1,76 @@
+{
+  "name": "e-equity-market",
+  "version": "0.2.2",
+  "private": true,
+  "description": "本机美股与 ETF 模拟交易工作台",
+  "author": "E-Equity",
+  "main": "desktop.cjs",
+  "scripts": {
+    "start": "electron .",
+    "web": "node server.cjs",
+    "test": "node --test test/*.test.cjs",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "check": "node --check server.cjs && node --check desktop.cjs && node --check public/app.js",
+    "test:mobile": "node --test iphone/tests/*.test.mjs",
+    "sync:mobile": "node scripts/sync-mobile.cjs",
+    "symbols:update": "node scripts/symbols.cjs",
+    "screenshots": "electron scripts/capture-screenshots.cjs",
+    "opensource:prepare": "node scripts/prepare-open-source.cjs"
+  },
+  "build": {
+    "appId": "local.equity.paper",
+    "productName": "E-Equity",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop.cjs",
+      "server.cjs",
+      "lib/**",
+      "public/**",
+      "data/**",
+      "package.json",
+      "使用说明.md",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": "nsis",
+      "artifactName": "E-Equity-Setup-${version}-${arch}.${ext}",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "纸上美股 E-Equity",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "language": "2052"
+    }
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": [
+    "paper-trading",
+    "stock-market",
+    "stocks",
+    "etf",
+    "electron",
+    "pwa",
+    "chinese"
+  ]
+}

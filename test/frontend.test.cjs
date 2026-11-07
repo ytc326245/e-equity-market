@@ -1,0 +1,22 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+test('actual order panel enables public-quote buy and clearly disables only during closure or bad quote',()=>{
+  const elements=new Map();
+  const element=selector=>{if(!elements.has(selector))elements.set(selector,{value:selector==='#order-mode'?'shares':selector==='#order-value'?'1':'',textContent:'',disabled:false,className:'',hidden:false,addEventListener(){},classList:{toggle(){}},setAttribute(){}});return elements.get(selector);};
+  const context=vm.createContext({document:{querySelector:element,querySelectorAll:()=>[],addEventListener(){}},setInterval(){},setTimeout(){},clearTimeout(){},Intl,Date,console,fetch:async()=>{throw new Error('offline test');}});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../public/quote-policy.js'),'utf8'),context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../public/app.js'),'utf8'),context);
+  context.fixture={account:{initialCents:100000,cashCents:100000,positions:{}},feed:{verified:false,tradingEnabled:true},market:{isOpen:true}};
+  context.quote={symbol:'AAPL',price:100,fetchedAt:new Date().toISOString(),timestamp:null,coverage:'unverified',verified:false,isRealTime:false,tradingStatus:'unknown'};
+  vm.runInContext("state=fixture;quotes.set('AAPL',quote);renderOrder();",context);
+  assert.equal(element('#submit-order').disabled,false);
+  assert.equal(element('#submit-order').textContent,'确认买入 AAPL');
+  assert.match(element('#order-status').textContent,/可能延迟/);
+  vm.runInContext('state.market.isOpen=false;renderOrder();',context);
+  assert.equal(element('#submit-order').disabled,true);assert.match(element('#submit-order').textContent,/休市/);
+  vm.runInContext("state.market.isOpen=true;quotes.get('AAPL').price=0;renderOrder();",context);
+  assert.equal(element('#submit-order').disabled,true);assert.match(element('#order-status').textContent,/报价无效/);
+});

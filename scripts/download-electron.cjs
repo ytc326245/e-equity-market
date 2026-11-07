@@ -1,0 +1,24 @@
+const fs=require('node:fs/promises');
+const fss=require('node:fs');
+const path=require('node:path');
+const crypto=require('node:crypto');
+const {Readable}=require('node:stream');
+const {pipeline}=require('node:stream/promises');
+const {execFileSync}=require('node:child_process');
+(async()=>{
+  const root=path.resolve(__dirname,'..'),version=require('../node_modules/electron/package.json').version;
+  const name=`electron-v${version}-win32-x64.zip`,zip=path.join(root,'.tools',name);
+  await fs.mkdir(path.dirname(zip),{recursive:true});
+  const expected=require('../node_modules/electron/checksums.json')[name];
+  if(!expected)throw new Error('缺少官方 Electron 校验值');
+  const url=process.argv.includes('--mirror')?`https://npmmirror.com/mirrors/electron/${version}/${name}`:`https://github.com/electron/electron/releases/download/v${version}/${name}`;
+  const response=await fetch(url,{signal:AbortSignal.timeout(180000)});
+  if(!response.ok)throw new Error(`Download HTTP ${response.status}`);
+  const hash=crypto.createHash('sha256');let bytes=0,next=20000000;
+  const stream=Readable.fromWeb(response.body);stream.on('data',chunk=>{hash.update(chunk);bytes+=chunk.length;if(bytes>=next){console.log(`Electron downloaded ${Math.round(bytes/1e6)} MB`);next+=20000000;}});
+  await pipeline(stream,fss.createWriteStream(zip));
+  if(hash.digest('hex')!==expected)throw new Error('Electron 完整性校验失败');
+  const dist=path.join(root,'node_modules/electron/dist');await fs.mkdir(dist,{recursive:true});execFileSync('tar',['-xf',zip,'-C',dist]);
+  await fs.writeFile(path.join(root,'node_modules/electron/path.txt'),'electron.exe');
+  console.log(`Electron ${version} ready, official SHA256 verified`);
+})().catch(e=>{console.error(e);process.exitCode=1;});

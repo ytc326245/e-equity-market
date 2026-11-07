@@ -1,0 +1,2 @@
+import html from '../public/equity.html?raw';
+export function GET(){return new Response(html,{headers:{'Content-Type':'text/html;charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}});}
