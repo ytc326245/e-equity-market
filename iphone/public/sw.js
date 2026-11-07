@@ -1,4 +1,4 @@
-const CACHE='e-equity-iphone-v1.0.2';
+const CACHE='e-equity-iphone-v1.1.0';
 const SHELL=['/','/app.js','/styles.css','/mobile.css','/account-core.js','/calendar.js','/quote-policy.js','/mobile-api.js','/mobile-shell.js','/mobile-dialogs.js','/icon.png','/icon.svg','/manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil((async()=>{const c=await caches.open(CACHE);await Promise.all(SHELL.map(async p=>{try{const r=await fetch(p,{cache:'reload'});if(r.ok&&!r.redirected)await c.put(p,r);}catch{}}));await self.skipWaiting();})());});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const k of await caches.keys())if(k.startsWith('e-equity-iphone-')&&k!==CACHE)await caches.delete(k);await self.clients.claim();})());});

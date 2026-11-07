@@ -1,6 +1,6 @@
 # E-Equity · Paper Trading
 
-A Chinese-first US stock and ETF paper-trading app for beginners to learn basic operations such as buying and selling. Supports Windows and iPhone with accounts stored locally. Valuation metrics such as price-to-book and price-to-earnings ratios are not included.
+A Chinese-first US stock and ETF paper-trading app for beginners to learn basic operations such as buying and selling. Supports Windows and iPhone with accounts stored locally. Includes PE/EPS (TTM), market cap, PB, dividend yield and 52-week range, with plain-language explanations and beginner onboarding.
 
 [中文](README.md) · [MIT license](LICENSE) · [Contributing](CONTRIBUTING.md)
 
@@ -12,6 +12,8 @@ A Chinese-first US stock and ETF paper-trading app for beginners to learn basic 
 - Independent iPhone PWA with on-device IndexedDB accounts.
 - Configurable virtual capital, fractional shares, watchlists, holdings and transaction history.
 - Intraday samples and historical close charts, with provider time and fetch time shown separately.
+- Core financial metrics with expandable details, provider/period labels and explicit missing-data states.
+- ETF-specific assets/expense ratios, a four-step beginner guide and order-entry tips.
 - New York trading dates, DST, holidays and early closes for 2026–2028.
 - JSON account backup/restore and CSV transaction export.
 - No brokerage account or API key required for the current public-quote adapter.

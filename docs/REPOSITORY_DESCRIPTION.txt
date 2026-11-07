@@ -1,1 +1,1 @@
-中文美股与 ETF 模拟交易工具（新手向，仅供股票小白熟悉基础操作，包含买入、卖出等基础操作，不包含市净率市盈率等数据），支持 Windows 和 iPhone，本地保存账户。Chinese-first US stock and ETF paper trading.
+中文美股与 ETF 模拟交易工具（新手向，支持买入、卖出等基础操作，包含 PE、EPS 等常用指标、指标解释与入门引导），支持 Windows 和 iPhone，本地保存账户。Chinese-first US stock and ETF paper trading.

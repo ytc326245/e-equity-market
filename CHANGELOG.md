@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-11-08
+
+- Add independent Yahoo/Nasdaq financial snapshots: PE/EPS (TTM), market cap, PB, dividend yield and 52-week range.
+- Show core metrics inline and expanded explanations, provenance, reporting periods and explicit unavailable states.
+- Treat ETFs separately with AUM and expense ratio; do not apply company EPS or valuation ratios.
+- Add a dismissible/reopenable four-step beginner guide and contextual order-entry tips.
+- Preserve independent quote/trade behavior during financial-provider failures and guard against stale UI replies.
+- Update phone runtime to 1.1.0.
+
 ## 0.2.2 — 2026-11-07
 
 - Prepare the first public source release with MIT licensing, Chinese/English documentation, contribution and security guidance.

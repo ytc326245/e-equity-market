@@ -5,6 +5,7 @@ const path=require('node:path');
 const http=require('node:http');
 const {startServer}=require('../server.cjs');
 const {Market}=require('../lib/market.cjs');
+const {normalizeFundamentals}=require('../lib/fundamentals.cjs');
 const root=path.resolve(__dirname,'..');
 app.setPath('userData',path.join(root,'work/screenshots-browser'));
 app.commandLine.appendSwitch('disable-gpu');
@@ -14,10 +15,23 @@ async function screenshot(url,width,height,file,mobile=false){
   const win=new BrowserWindow({show:false,width,height,useContentSize:true,webPreferences:{offscreen:true,nodeIntegration:false,contextIsolation:true,sandbox:true}});
   try{
     await win.loadURL(url);
+    await win.webContents.executeJavaScript("dismissLearning();");
     await win.webContents.executeJavaScript(`(async()=>{for(let i=0;i<120;i++){if(document.querySelector('#chart-container svg')&&document.querySelector('#quote-meta').textContent.includes('演示数据'))return;await new Promise(r=>setTimeout(r,100));}throw Error('Demo UI did not finish loading');})()`);
     if(mobile)await win.webContents.executeJavaScript(`(async()=>{await EquityMobileAPI.request('/api/account/reset',{capital:'10000',confirm:true});await loadState();document.querySelector('#install-hint').hidden=true;window.scrollTo(0,document.querySelector('.chart-panel').getBoundingClientRect().top+window.scrollY-80);})()`);
     await win.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
     await fs.writeFile(file,(await win.webContents.capturePage()).toPNG());
+    if(!mobile){
+      await win.webContents.executeJavaScript("openFundamentals('pe');");
+      await win.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      await fs.writeFile(path.join(path.dirname(file),'fundamentals.png'),(await win.webContents.capturePage()).toPNG());
+      await win.webContents.executeJavaScript("closeDialog('fundamentals-dialog');openGuide();");
+      await win.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      await fs.writeFile(path.join(path.dirname(file),'learning.png'),(await win.webContents.capturePage()).toPNG());
+    }else{
+      await win.webContents.executeJavaScript("openFundamentals('pb');");
+      await win.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+      await fs.writeFile(path.join(path.dirname(file),'mobile-fundamentals.png'),(await win.webContents.capturePage()).toPNG());
+    }
   }finally{win.destroy();}
 }
 app.whenReady().then(async()=>{
@@ -26,6 +40,7 @@ app.whenReady().then(async()=>{
   const now='2026-11-06T21:15:00Z',market=new Market();
   market.info=()=>({provider:'演示数据（仅文档截图）',symbols:22,tradingEnabled:true,verified:false});
   market.quote=async symbol=>({symbol,price:105.25,change:1.2,changePercent:1.15,previousClose:104.05,volume:123456,fetchedAt:now,asOf:'演示数据 · 2026-11-06',provider:'演示数据（仅文档截图）',coverage:'demo',verified:false,isRealTime:false});
+  market.fundamentals=async symbol=>{const n=raw=>({raw}),data=normalizeFundamentals(symbol,market.symbol(symbol).type,{price:{symbol,currency:'USD',regularMarketTime:1793998800},summaryDetail:{marketCap:n(150000000000),trailingPE:n(21.05),dividendYield:n(.012),fiftyTwoWeekHigh:n(120),fiftyTwoWeekLow:n(80)},defaultKeyStatistics:{trailingEps:n(5),priceToBook:n(4.2),bookValue:n(25),mostRecentQuarter:n(1790726400)}},null,{fetchedAt:now});data.sources.forEach(s=>s.provider='演示数据（仅文档截图）');Object.values(data.metrics).forEach(m=>{if(m.provider)m.provider='演示数据（仅文档截图）';});return data;};
   market.chart=async(symbol,range='1D')=>{const start=Date.parse('2026-11-06T14:30:00Z'),end=Date.parse('2026-11-06T21:00:00Z');return {symbol,range,sessionDate:'2026-11-06',asOf:'演示数据',session:{start,end},points:Array.from({length:390},(_,i)=>({time:start+i*60000,price:100+Math.sin(i/24)*1.3+i*.014})),provider:'演示数据（仅文档截图）'};};
   desktop=await startServer({port:0,directory,market,clock:()=>new Date(now)});
   const state=await(await fetch(desktop.origin+'/api/state')).json();

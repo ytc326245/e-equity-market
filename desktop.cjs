@@ -1,11 +1,14 @@
-const {app,BrowserWindow,Menu,shell,dialog}=require('electron');
+const {app,BrowserWindow,Menu,shell,dialog,session}=require('electron');
 const {startServer}=require('./server.cjs');
+const {Market}=require('./lib/market.cjs');
 let window,service;
 if(!app.requestSingleInstanceLock()){app.quit();}else{
   app.on('second-instance',()=>{if(window){window.show();if(window.isMinimized())window.restore();window.focus();}});
   app.whenReady().then(async()=>{
     const selfCheck=process.argv.includes('--self-check');
-    service=await startServer({port:selfCheck?0:17653});
+    // Use the operating system's network/proxy settings for supplemental financial data.
+    const financialSession=session.fromPartition('equity-financial-data');
+    service=await startServer({port:selfCheck?0:17653,market:new Market({financialFetch:(url,options)=>financialSession.fetch(url,options)})});
     if(selfCheck){
       if(!process.env.EEQUITY_SELF_CHECK_REPORT)throw new Error('自检报告路径未设置');
       const response=await fetch(service.origin+'/api/state');const data=await response.json();

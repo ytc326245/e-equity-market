@@ -20,6 +20,8 @@ The public source export uses a small manually maintained security directory and
 
 Sources:
 
+- Yahoo Finance financial statistics: https://finance.yahoo.com/
+- Yahoo terms: https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html
 - Nasdaq website: https://www.nasdaq.com/
 - Nasdaq Trader symbol-directory definitions: https://www.nasdaqtrader.com/trader.aspx?id=symboldirdefs
 - Nasdaq website terms: https://www.nasdaq.com/terms

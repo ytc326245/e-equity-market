@@ -12,7 +12,9 @@ await fs.writeFile('public/account-core.js',`'use strict';\n(function(root){\n${
 let market=await fs.readFile(path.join(root,'lib/market.cjs'),'utf8');
 market=market.slice(market.indexOf('const aliases='));
 market=`import listing from '../data/symbols.json' with {type:'json'};\nimport {marketStatus} from './equity-calendar.mjs';\nconst validSymbol=s=>typeof s==='string'&&/^[A-Z0-9][A-Z0-9.\\-^]{0,14}$/.test(s);\n`+market.replace('module.exports={Market};','export {Market};');
+market="import {YahooFundamentals,normalizeFundamentals} from './equity-fundamentals.mjs';\n"+market;
 await fs.writeFile('lib/equity-market.mjs',market);
+await fs.writeFile('lib/equity-fundamentals.mjs',(await fs.readFile(path.join(root,'lib/fundamentals.cjs'),'utf8')).replace('module.exports={YahooFundamentals,normalizeFundamentals};','export {YahooFundamentals,normalizeFundamentals};'));
 const calendar=(await fs.readFile(path.join(root,'lib/calendar.cjs'),'utf8')).replace('module.exports = { marketStatus };','export {marketStatus};');
 await fs.writeFile('lib/equity-calendar.mjs',calendar);
 await fs.writeFile('public/calendar.js',`(function(root){\n${calendar.replace('export {marketStatus};','root.EquityCalendar={marketStatus};')}\n})(globalThis);`);
@@ -26,7 +28,7 @@ await fs.writeFile('public/app.js',app);
 let html=await fs.readFile(path.join(root,'public/index.html'),'utf8');
 html=html.replace('width=device-width,initial-scale=1','width=device-width,initial-scale=1,viewport-fit=cover');
 html=html.replace('<title>纸上美股 · E-Equity</title>','<title>纸上美股 · iPhone</title><meta name="theme-color" content="#0b0e14"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="纸上美股"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon.png">');
-html=html.replace('<script src="/app.js" defer>','<link rel="stylesheet" href="/mobile.css?v=1.0.2"><script src="/account-core.js" defer></script><script src="/calendar.js" defer></script><script src="/mobile-api.js" defer></script><script src="/mobile-shell.js?v=1.0.2" defer></script><script src="/mobile-dialogs.js?v=1.0.2" defer></script><script src="/app.js" defer>');
+html=html.replace('<script src="/app.js" defer>','<link rel="stylesheet" href="/mobile.css?v=1.1.0"><script src="/account-core.js" defer></script><script src="/calendar.js" defer></script><script src="/mobile-api.js" defer></script><script src="/mobile-shell.js?v=1.1.0" defer></script><script src="/mobile-dialogs.js?v=1.1.0" defer></script><script src="/app.js" defer>');
 html=html.replace('<span class="paper-badge">PAPER TRADING</span>','<button class="icon-button mobile-search" id="mobile-search" aria-label="搜索股票">⌕</button><span class="paper-badge">PAPER TRADING</span>');
 html=html.replace('<div class="content">','<div class="content"><section class="install-hint" id="install-hint"><img src="/icon.png" alt=""><div><strong>把纸上美股放到主屏幕</strong><small>Safari 分享 → 添加到主屏幕</small></div><button class="icon-button" id="install-dismiss" aria-label="关闭添加提示">×</button></section>');
 html=html.replace('记录只保存在这台电脑','记录只保存在这部手机').replace('v'+desktopVersion,'iPhone v'+phoneVersion);

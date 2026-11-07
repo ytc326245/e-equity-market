@@ -1,3 +1,4 @@
+import {YahooFundamentals,normalizeFundamentals} from './equity-fundamentals.mjs';
 import listing from '../data/symbols.json' with {type:'json'};
 import {marketStatus} from './equity-calendar.mjs';
 const validSymbol=s=>typeof s==='string'&&/^[A-Z0-9][A-Z0-9.\-^]{0,14}$/.test(s);
@@ -57,7 +58,7 @@ function normalizeIntraday(data){
   return {points:[...byTime.values()],sessionDate,session:{start,end,closeTime:sessionStatus.closeTime},timeZone:'America/New_York',timestampEncoding:[...encodings][0]||null,priceType:'provider-chart-sample',diagnostics:{input:(data.chart||[]).length,invalid,outsideSession,wrongDate,duplicates}};
 }
 class Market {
-  constructor(){this.cache=new Map();this.pending=new Map();}
+  constructor({financialFetch=fetch}={}){this.cache=new Map();this.pending=new Map();this.financialData=new YahooFundamentals(financialFetch);}
   info(){return {provider:'Nasdaq 公开行情',coverage:'unverified',verified:false,isRealTime:false,tradingEnabled:true,executionMode:'public-quote',delayMayApply:true,status:'真实报价模拟交易已开放',note:'正常交易时段按公开真实报价模拟成交；行情可能存在延迟，不保证与券商实时价格完全一致。报价时间与读取时间分别标注。',symbols:listing.symbols.length,listingUpdatedAt:listing.updatedAt,source:'https://www.nasdaq.com/market-activity',calendarSource:'https://www.nyse.com/trade/hours-calendars'};}
   search(query){const q=String(query??'').trim().toUpperCase().slice(0,100); if(!q)return ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','AMZN','GOOGL','VOO','VTI'].map(s=>this.symbol(s)).filter(Boolean);
     return listing.symbols.filter(x=>x.symbol.includes(q)||x.name.toUpperCase().includes(q)||aliases[x.symbol]?.includes(q)).sort((a,b)=>(a.symbol===q?-1:b.symbol===q?1:0)||(a.symbol.startsWith(q)?0:1)-(b.symbol.startsWith(q)?0:1)).slice(0,40).map(x=>({...x,alias:aliases[x.symbol]||''}));}
@@ -82,6 +83,14 @@ class Market {
     if(price===null||price<=0)throw new Error('该标的尚无有效报价');
     return {symbol,price,change:numeric(p.netChange),changePercent:numeric(p.percentageChange),volume:numeric(p.volume),previousClose:numeric(p.netChange)===null?null:price-numeric(p.netChange),timestamp:null,asOf:p.lastTradeTimestamp||'来源未提供',fetchedAt:new Date().toISOString(),provider:'Nasdaq 公开行情',coverage:'unverified',verified:false,isRealTime:p.isRealTime===true,providerMarketStatus:data.marketStatus,tradingStatus:'unknown',source:`https://www.nasdaq.com/market-activity/${this.symbol(symbol).type==='ETF'?'etf':'stocks'}/${symbol.toLowerCase()}`};
   },fresh);}
+  fundamentals(symbol,{fresh=false}={}){
+    const security=this.symbol(symbol);if(!validSymbol(symbol)||!security)return Promise.reject(new Error('股票不在当前上市目录中'));
+    const key=`fundamentals:${symbol}`,old=this.cache.get(key),ttl=old?.value.status==='available'?300000:30000;
+    return this.cached(key,ttl,async()=>{
+      const [yahoo,nasdaq]=await Promise.allSettled([this.financialData.read(symbol),this.request(symbol,'summary')]);
+      return normalizeFundamentals(symbol,security.type,yahoo.status==='fulfilled'?yahoo.value:null,nasdaq.status==='fulfilled'?nasdaq.value:null,{warnings:[...(yahoo.status==='rejected'?['Yahoo 财务数据暂不可用，部分指标可能缺失']:[]),...(nasdaq.status==='rejected'?['Nasdaq 汇总数据暂不可用，部分指标可能缺失']:[])]});
+    },fresh);
+  }
   chart(symbol,range='1D',{fresh=false}={}){const today=nyParts(Date.now());return this.cached(`chart-v2:${symbol}:${range}:${today.year}-${today.month}-${today.day}`,60000,async()=>{
     if(!['1D','1M','3M','1Y'].includes(range))throw new Error('图表区间无效');
     let points=[],asOf='',details={};

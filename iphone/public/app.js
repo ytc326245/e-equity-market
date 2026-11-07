@@ -9,6 +9,26 @@ const color=v=>v>0?'positive':v<0?'negative':'muted';
 const date=v=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('zh-CN',{hour12:false}):'—';
 let state=null,symbol='AAPL',security={symbol:'AAPL',name:'Apple Inc.',type:'STOCK'},range='1D',side='buy',page='terminal',selection=0,searchRevision=0,searchTimer,toastTimer,confirmation=null,refreshing=false,submitting=false,serverOffset=0;
 const quotes=new Map(),quoteErrors=new Map(),metadata=new Map();
+const fundamentals=new Map(),fundamentalErrors=new Map(),fundamentalLoading=new Set(),fundamentalRevisions=new Map();
+let guideStep=0,fundamentalsDetailStamp='';
+const learningKey='e-equity.learning.v1';
+const metricDefinitions={
+  pe:{label:'PE 市盈率',unit:'倍',explanation:'股价相对于每股盈利的倍数。这里使用来源的 TTM（过去 12 个月）市盈率，不是预测 PE。盈利不大于零时不作通常的估值比较；高低本身不代表买卖结论。'},
+  eps:{label:'EPS 每股盈利',unit:'USD',explanation:'过去 12 个月归属于每股的盈利，不是每股股息。采用 Yahoo 的 TTM 数据，可能与公司公告或其他网站的调整口径不同；负值表示该口径下每股亏损。'},
+  marketCap:{label:'总市值',unit:'USD',explanation:'公司全部已发行股份按市价估算的总价值，不是公司账上现金。随股价和股本变化，展示来源快照。'},
+  pb:{label:'PB 市净率',unit:'倍',explanation:'股价相对于每股账面净资产的倍数，财报通常按季度更新。净资产不大于零时不作通常比较。不同行业的资产结构不同，不能仅靠 PB 判断便宜或昂贵。'},
+  dividendYield:{label:'股息率',unit:'%',explanation:'现金股息或基金分配相对价格的比例。公司优先使用 Yahoo 预期年度股息率，缺失时使用 Nasdaq Current Yield；基金使用来源的分配收益率。请查看下方口径。股息会调整，这不是承诺收益。'},
+  week52High:{label:'52 周最高价',unit:'USD',explanation:'来源记录的过去 52 周最高交易价，不是当天最高价，也不代表未来价格上限。复权与价格覆盖范围不同可能造成平台差异。'},
+  week52Low:{label:'52 周最低价',unit:'USD',explanation:'来源记录的过去 52 周最低交易价，不是当天最低价，也不代表未来价格下限。'},
+  aum:{label:'基金资产规模',unit:'USD',explanation:'ETF 管理的资产总额（AUM），用于了解基金规模，不等同于普通公司的总市值。Nasdaq 标注为千美元时，软件会转换为美元。'},
+  expenseRatio:{label:'基金年费率',unit:'%',explanation:'基金每年运营费用占资产的比例，通常已在基金净值中体现，不是每次买卖收取的手续费。本软件不会另行模拟扣除基金费用。'}
+};
+const guideSteps=[
+  {title:'设置一笔虚拟本金',text:'账户里的美元都是虚拟资金，买卖不会连接真实券商。先选择一个方便练习的金额；重新设置本金会开始新一轮，已有记录请先备份。',action:'capital',button:'查看本金设置'},
+  {title:'找到股票或 ETF',text:'用代码、英文名称或常用中文名搜索。股票代表一家公司的股份；ETF 通常持有一篮子资产。点星标可以加入自选。',action:'search',button:'试试搜索'},
+  {title:'看价格，也看指标口径',text:'主界面放常用指标，点任意指标可看解释、来源与财报期。TTM 表示过去 12 个月；“暂无数据”不等于零。ETF 不套用公司的 EPS、PE 或 PB。',action:'metrics',button:'看看当前标的指标'},
+  {title:'练习一笔买卖，再复盘',text:'先选买入或卖出，再选择按金额或股数输入。卖出需要已有持仓。只在美股正常交易时段模拟成交，提交时重新读取报价；休市时可以观察行情。成交后去持仓和记录页查看变化，记得导出备份。',action:'order',button:'查看下单区域'}
+];
 async function api(url,body){return EquityMobileAPI.request(url,body);}
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5000);}
 function showDialog(id){const d=$('#'+id);if(!d.open)d.showModal();}
@@ -65,6 +85,7 @@ function renderOrder(){
   $('#order-price').textContent=q?usd(q.price):'—';$('#order-unit').textContent=mode==='amount'?'USD':'股';$('#order-value-label').textContent=`${side==='buy'?'买入':'卖出'}${mode==='amount'?'金额':'股数'}`;$('#estimate-label').textContent=mode==='amount'?'预计股数':'预计金额';
   $('#estimate').textContent=q&&v>0&&Number.isFinite(v)?mode==='amount'?num(Math.floor(v/q.price*1e6)/1e6)+' 股':usd(v*q.price):'—';
   const block=tradingBlock();$('#order-status').textContent=block||'按公开真实报价模拟成交，行情可能延迟；提交时会重新读取价格。';$('#submit-order').disabled=!!block||!(v>0)||!Number.isFinite(v)||submitting;$('#submit-order').textContent=submitting?'正在处理…':block?(state?.account.initialCents===null?'请先设置本金':!state?.market.isOpen?'休市中，暂不能交易':'等待有效报价'):`确认${side==='buy'?'买入':'卖出'} ${symbol}`;
+  $('#order-tip').textContent=side==='sell'?'卖出只能使用已有持仓，不能卖空。金额和股数可以切换，预计结果会随报价变化。':mode==='amount'?'按金额：输入想使用的虚拟美元，软件估算可买股数；支持不足一整股。提交时会重新读取价格。':'按股数：输入想买的股数，支持最多 6 位小数。预计金额随报价变化，请留意可用资金。';
 }
 function renderQuote(){
   const q=quotes.get(symbol),err=quoteErrors.get(symbol);$('#ticker-logo').textContent=symbol.slice(0,1);
@@ -72,12 +93,53 @@ function renderQuote(){
   $('#ticker-name').textContent=security.alias?`${security.alias} · ${security.name}`:security.name;
   $('#quote-price').textContent=q?usd(q.price):'—';$('#quote-change').textContent=q&&q.change!==null?`${signed(q.change)} (${signed(q.changePercent??0)}%)`:err?'暂无可用报价':'正在读取报价';$('#quote-change').className='quote-change '+(q?color(q.change):'muted');
   $('#quote-meta').textContent=q?`来源：${q.provider} · 报价时间（来源）：${q.asOf} · 读取：${date(q.fetchedAt)} · 可能延迟`:err||'来源：Nasdaq 公开行情';
-  $('#stat-close').textContent=q?usd(q.previousClose):'—';$('#stat-volume').textContent=q&&q.volume!==null?num(q.volume,0):'—';renderOrder();
+  $('#stat-close').textContent=q?usd(q.previousClose):'—';$('#stat-volume').textContent=q&&q.volume!==null?num(q.volume,0):'—';renderFundamentals();renderOrder();
 }
+function metricValue(key,metric){
+  if(!metric||metric.value===null||!Number.isFinite(metric.value))return metric?.status==='not-applicable'?'不适用':metric?.status==='not-meaningful'?'不具比较意义':'—';
+  const value=metric.value;
+  if(['marketCap','aum'].includes(key))return value>=1e12?`${num(value/1e12,2)} 万亿美元`:value>=1e8?`${num(value/1e8,2)} 亿美元`:usd(value);
+  return metricDefinitions[key].unit==='USD'?usd(value):`${num(value,2)}${metricDefinitions[key].unit}`;
+}
+function renderFundamentals(){
+  const data=fundamentals.get(symbol),etf=security.type==='ETF',loading=fundamentalLoading.has(symbol);
+  const keys=etf?['aum','expenseRatio','week52High','week52Low']:['pe','eps','marketCap','dividendYield'];
+  $('#fundamentals-core').innerHTML=keys.map(key=>`<button class="fundamental-card" data-metric="${key}" aria-label="查看${metricDefinitions[key].label}详情与解释"><span>${metricDefinitions[key].label}${['pe','eps'].includes(key)?' · TTM':''}<i aria-hidden="true">ⓘ</i></span><strong>${escapeHtml(metricValue(key,data?.metrics[key]))}</strong></button>`).join('');
+  $('#fundamentals-note').textContent=loading?'正在读取财务指标，报价与买卖可独立使用…':fundamentalErrors.get(symbol)||(!data?'财务指标待加载':`${data.status==='partial'?'部分指标暂无数据 · ':data.status==='unavailable'?'当前暂无可用财务数据 · ':''}来源：${[...new Set(data.sources.map(s=>s.provider))].join(' / ')||'暂不可用'} · 读取 ${date(data.fetchedAt)} · 点指标查看口径`);
+  if($('#fundamentals-dialog').open&&fundamentalsDetailStamp!==fundamentalStamp())renderFundamentalsDetails();
+}
+function fundamentalStamp(){return `${symbol}|${fundamentals.get(symbol)?.fetchedAt}|${fundamentalLoading.has(symbol)}|${fundamentalErrors.get(symbol)}`;}
+function renderFundamentalsDetails(focusKey=null){
+  fundamentalsDetailStamp=fundamentalStamp();
+  const data=fundamentals.get(symbol),etf=security.type==='ETF';
+  const keys=etf?['aum','expenseRatio','dividendYield','week52High','week52Low','pe','eps','pb']:['pe','eps','marketCap','pb','dividendYield','week52High','week52Low'];
+  $('#fundamentals-title').textContent=`${symbol} · 指标与解释`;
+  $('#fundamentals-context').textContent=etf?'ETF 使用基金规模与费率等信息；公司口径的 PE、EPS、PB 标为不适用。': 'TTM = 过去 12 个月；PB 参考最近财报。财务指标并非实时更新，不会参与模拟成交定价。';
+  const openKeys=new Set($$('#fundamentals-details details[open]').map(d=>d.dataset.metricKey));
+  $('#fundamentals-details').innerHTML=keys.map(key=>{const d=metricDefinitions[key],m=data?.metrics[key];return `<details class="metric-detail" data-metric-key="${key}"${focusKey===key||(!focusKey&&openKeys.has(key))?' open':''}><summary><span>${d.label}${['pe','eps'].includes(key)?'（TTM）':''}</span><strong>${escapeHtml(metricValue(key,m))}</strong></summary><p>${d.explanation}</p><p class="metric-provenance">${escapeHtml(m?.reason||m?.period||(fundamentalLoading.has(symbol)?'正在读取…':'来源暂未提供可核验数据'))}${m?.provider?`<br>来源：${escapeHtml(m.provider)}`:''}${m?.provider?` · 读取 ${escapeHtml(date(data.fetchedAt))}`:''}</p></details>`;}).join('');
+  $('#fundamentals-sources').innerHTML=data?.sources.map(s=>`<p>${escapeHtml(s.provider)}${s.financialPeriod?` · 最近财报期 ${escapeHtml(s.financialPeriod)}`:''}${s.quoteAsOf?`<br>估值参考行情时间（本地）：${escapeHtml(date(s.quoteAsOf))}`:''}</p>`).join('')||'';
+  $('#fundamentals-warning').textContent=data?.warnings.join('；')||fundamentalErrors.get(symbol)||'';
+  $('#fundamentals-refresh').disabled=fundamentalLoading.has(symbol);
+}
+function openFundamentals(key=null){renderFundamentalsDetails(key);showDialog('fundamentals-dialog');}
+async function loadFundamentals(target,{fresh=false}={}){
+  const revision=(fundamentalRevisions.get(target)||0)+1;fundamentalRevisions.set(target,revision);
+  fundamentalLoading.add(target);fundamentalErrors.delete(target);if(target===symbol)renderFundamentals();
+  try{const data=await api(`/api/fundamentals?symbol=${encodeURIComponent(target)}${fresh?'&fresh=1':''}`);if(fundamentalRevisions.get(target)!==revision)return;if(data.symbol!==target)throw new Error('财务数据与所选标的不匹配');fundamentals.set(target,data);}
+  catch(e){if(fundamentalRevisions.get(target)===revision){fundamentals.delete(target);fundamentalErrors.set(target,e.message);}}
+  finally{if(fundamentalRevisions.get(target)===revision){fundamentalLoading.delete(target);if(target===symbol)renderFundamentals();}}
+}
+function learningSaved(){try{return localStorage.getItem(learningKey)!==null;}catch{return false;}}
+function dismissLearning(){try{localStorage.setItem(learningKey,'dismissed');}catch{}$('#learning-card').hidden=true;}
+function renderGuide(){
+  const step=guideSteps[guideStep];$('#guide-progress').textContent=`${guideStep+1} / ${guideSteps.length}`;$('#guide-title').textContent=step.title;$('#guide-text').textContent=step.text;$('#guide-action').textContent=step.button;$('#guide-action').dataset.guideAction=step.action;$('#guide-back').disabled=guideStep===0;$('#guide-next').textContent=guideStep===guideSteps.length-1?'完成引导':'下一步';
+}
+function openGuide(){guideStep=0;renderGuide();showDialog('guide-dialog');}
 async function getQuote(s,{fresh=false}={}){try{const q=await api('/api/quote?symbol='+encodeURIComponent(s)+(fresh?'&fresh=1':''));quotes.set(s,q);quoteErrors.delete(s);}catch(e){quotes.delete(s);quoteErrors.set(s,e.message);}renderWatchlist();renderPositions();if(s===symbol)renderQuote();}
 async function selectSymbol(s){
   symbol=s;const revision=++selection;setPage('terminal');range=range||'1D';
   security=metadata.get(s)||{symbol:s,name:'正在读取名称…',type:'STOCK'};renderQuote();renderWatchlist();
+  loadFundamentals(s);
   const metaRequest=api('/api/search?q='+encodeURIComponent(s)).then(r=>{r.results.forEach(m=>metadata.set(m.symbol,m));if(revision===selection){security=metadata.get(s)||security;renderQuote();renderWatchlist();}}).catch(()=>{});
   await Promise.allSettled([metaRequest,getQuote(s),loadChart()]);renderState();
 }
@@ -112,6 +174,9 @@ document.addEventListener('click',async event=>{
   const button=event.target.closest('button,a,tr');if(!button)return;
   if(button.dataset.page)setPage(button.dataset.page);
   if(button.dataset.close){closeDialog(button.dataset.close);if(button.dataset.close==='confirm-dialog')confirmation=null;}
+  if(button.dataset.metric)openFundamentals(button.dataset.metric);
+  if(button.hasAttribute('data-start-guide'))openGuide();
+  if(button.dataset.guideAction){closeDialog('guide-dialog');const action=button.dataset.guideAction;if(action==='capital'){if(state?.account.initialCents===null)openCapital();else setPage('settings');}if(action==='search')openSearch();if(action==='metrics'){setPage('terminal');openFundamentals(security.type==='ETF'?'aum':'pe');}if(action==='order'){setPage('terminal');$('#order-value').scrollIntoView({behavior:'smooth',block:'center'});$('#order-value').focus();}}
   if(button.hasAttribute('data-open-capital'))openCapital();
   if(button.hasAttribute('data-search'))openSearch();
   if(button.dataset.symbol)await selectSymbol(button.dataset.symbol);
@@ -125,7 +190,9 @@ document.addEventListener('click',async event=>{
     $('#order-value').value=Number(value||0).toFixed(mode==='amount'?2:6);renderOrder();}
 });
 $('#search-open').onclick=openSearch;$('#search-shortcut').onclick=openSearch;$('#reset-open').onclick=openCapital;$('#help-open').onclick=()=>showDialog('help-dialog');
-$('#refresh-quote').onclick=async event=>{event.currentTarget.disabled=true;try{await Promise.allSettled([getQuote(symbol,{fresh:true}),loadChart({fresh:true})]);renderState();}finally{$('#refresh-quote').disabled=false;}};
+$('#fundamentals-open').onclick=()=>openFundamentals();$('#fundamentals-refresh').onclick=()=>loadFundamentals(symbol,{fresh:true});
+$('#learning-dismiss').onclick=dismissLearning;$('#guide-back').onclick=()=>{if(guideStep>0)guideStep--;renderGuide();};$('#guide-next').onclick=()=>{if(guideStep<guideSteps.length-1){guideStep++;renderGuide();}else{dismissLearning();closeDialog('guide-dialog');}};
+$('#refresh-quote').onclick=async event=>{event.currentTarget.disabled=true;loadFundamentals(symbol,{fresh:true});try{await Promise.allSettled([getQuote(symbol,{fresh:true}),loadChart({fresh:true})]);renderState();}finally{$('#refresh-quote').disabled=false;}};
 $('#search-input').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(search,180);});
 $('#order-mode').addEventListener('change',()=>{$('#order-value').value='';renderOrder();});$('#order-value').addEventListener('input',renderOrder);
 $('#toggle-watch').onclick=async()=>{if(!state)return;try{const remove=state.account.watchlist.includes(symbol);await api('/api/watchlist',{symbol,remove});await loadState();toast(remove?'已从自选移除':'已加入自选');}catch(e){toast(e.message);}};
@@ -138,9 +205,9 @@ $('#import-file').addEventListener('change',async()=>{const file=$('#import-file
 document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();if(!$$('dialog').some(d=>d.open))openSearch();}if(event.key==='F1'){event.preventDefault();if(!$$('dialog').some(d=>d.open))showDialog('help-dialog');}});
 async function refreshQuotes(){
   if(!state||refreshing)return;refreshing=true;
-  try{const symbols=[...new Set([symbol,...state.account.watchlist,...Object.keys(state.account.positions)])];for(let i=0;i<symbols.length;i+=3)await Promise.allSettled(symbols.slice(i,i+3).map(getQuote));renderState();}finally{refreshing=false;}
+  try{const symbols=[...new Set([symbol,...state.account.watchlist,...Object.keys(state.account.positions)])];for(let i=0;i<symbols.length;i+=3)await Promise.allSettled(symbols.slice(i,i+3).map(getQuote));renderState();if(!fundamentalLoading.has(symbol)&&Date.now()-Date.parse(fundamentals.get(symbol)?.fetchedAt||0)>300000)loadFundamentals(symbol);}finally{refreshing=false;}
 }
-async function boot(){try{await loadState();const results=await api('/api/search');results.results.forEach(m=>metadata.set(m.symbol,m));await selectSymbol(symbol);await refreshQuotes();}catch(e){toast(e.message);$('#market-label').textContent='本机服务未连接';$('#quote-meta').textContent=e.message;}}
+async function boot(){$('#learning-card').hidden=learningSaved();try{await loadState();const results=await api('/api/search');results.results.forEach(m=>metadata.set(m.symbol,m));await selectSymbol(symbol);await refreshQuotes();}catch(e){toast(e.message);$('#market-label').textContent='本机服务未连接';$('#quote-meta').textContent=e.message;}}
 let lastQuoteRefresh=0;
 setInterval(()=>{renderClock();renderOrder();},1000);
 setInterval(async()=>{try{await loadState();if(Date.now()-lastQuoteRefresh>(state.market.isOpen?30000:300000)){lastQuoteRefresh=Date.now();await refreshQuotes();if(page==='terminal')await loadChart();}}catch(e){$('#market-label').textContent='本机服务未连接';}},15000);

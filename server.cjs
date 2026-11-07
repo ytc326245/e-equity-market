@@ -25,6 +25,7 @@ async function startServer({port=17653,directory=defaultDataDir(),market=new Mar
         if(route==='/api/state')return json(res,200,{account:account.snapshot(),market:marketStatus(clock()),feed:market.info(),token,serverTime:clock().toISOString()});
         if(route==='/api/search')return json(res,200,{results:market.search(url.searchParams.get('q'))});
         if(route==='/api/quote')return json(res,200,await market.quote(url.searchParams.get('symbol'),{fresh:url.searchParams.get('fresh')==='1'}));
+        if(route==='/api/fundamentals')return json(res,200,await market.fundamentals(url.searchParams.get('symbol'),{fresh:url.searchParams.get('fresh')==='1'}));
         if(route==='/api/chart')return json(res,200,await market.chart(url.searchParams.get('symbol'),url.searchParams.get('range')||'1D',{fresh:url.searchParams.get('fresh')==='1'}));
         if(route==='/api/export'){
           res.setHeader('Content-Disposition',`attachment; filename="E-Equity-backup-${new Date().toISOString().slice(0,10)}.json"`);
