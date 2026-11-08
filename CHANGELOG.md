@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-11-08
+
+- Add a dedicated beginner classroom with nine lessons covering quotes, account figures, EPS/TTM, PE/PB/market cap, dividends/ranges, ETFs, price formation and data provenance.
+- Add dated AAPL, MSFT and INTC observation cards, progressive examples, comprehension questions, glossary search and a valuation-assumption exercise.
+- Link metric explanations to relevant lessons, retain learning progress on-device and include lesson assets in the phone offline shell.
+- Explain uncertainty, financial periods and source scope; examples do not produce trade recommendations or place orders.
+- Permit only reviewed tutorial reference URLs to open in the external desktop browser. Mobile runtime is 1.2.0.
+
 ## 0.3.1 — 2026-11-08
 
 - Audit 22 starter symbols against Yahoo Finance and TradingView, including daily/intraday histories for AAPL, MSFT and SPY.

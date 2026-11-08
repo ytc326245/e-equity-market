@@ -1,6 +1,7 @@
 const {app,BrowserWindow,Menu,shell,dialog,session}=require('electron');
 const {startServer}=require('./server.cjs');
 const {Market}=require('./lib/market.cjs');
+const {isReference}=require('./public/tutorial.js');
 let window,service;
 if(!app.requestSingleInstanceLock()){app.quit();}else{
   app.on('second-instance',()=>{if(window){window.show();if(window.isMinimized())window.restore();window.focus();}});
@@ -18,7 +19,7 @@ if(!app.requestSingleInstanceLock()){app.quit();}else{
       await new Promise(resolve=>service.server.close(resolve));app.exit(report.ok?0:1);return;
     }
     window=new BrowserWindow({width:1480,height:980,minWidth:1050,minHeight:720,backgroundColor:'#0c1017',icon:require('node:path').join(__dirname,'public/icon.png'),title:'纸上美股 · E-Equity',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,devTools:!app.isPackaged}});
-    window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+    window.webContents.setWindowOpenHandler(({url})=>{if(isReference(url))shell.openExternal(url);return {action:'deny'};});
     window.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==service.origin)event.preventDefault();});
     window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
     window.webContents.session.on('will-download',async(event,item)=>{

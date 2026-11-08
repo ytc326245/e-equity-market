@@ -25,3 +25,5 @@ Sources:
 - Nasdaq website: https://www.nasdaq.com/
 - Nasdaq Trader symbol-directory definitions: https://www.nasdaqtrader.com/trader.aspx?id=symboldirdefs
 - Nasdaq website terms: https://www.nasdaq.com/terms
+
+Tutorial case studies contain small, dated, attributed educational snapshots. These are separate from live quote adapters and are never used as a runtime price fallback.

@@ -37,8 +37,8 @@ function toast(message){$('#toast').textContent=message;$('#toast').hidden=false
 function showDialog(id){const d=$('#'+id);if(!d.open)d.showModal();}
 function closeDialog(id){$('#'+id).close();}
 function confirmAction(title,message,callback){$('#confirm-title').textContent=title;$('#confirm-message').textContent=message;confirmation=callback;showDialog('confirm-dialog');}
-const pageTitles={terminal:['交易工作台','从这里，开始观察市场','跟随真实行情，管理你的虚拟投资组合。'],positions:['我的持仓','你的投资组合','了解每一笔持仓，以及它对账户的影响。'],history:['交易记录','每一次决策，都有记录','回顾买卖过程，找到属于自己的节奏。'],data:['行情状态','看清数据，也看清边界','查看当前数据来源、覆盖范围和交易可用状态。'],settings:['账户设置','从你选择的起点开始','设置虚拟本金，管理本机账户与备份。']};
-function setPage(value){window.scrollTo({top:0,behavior:"auto"});if(!pageTitles[value])return;page=value;$$('.view').forEach(v=>v.hidden=v.id!==`view-${page}`);$$('.nav[data-page]').forEach(v=>v.classList.toggle('active',v.dataset.page===page));$('#page-name').textContent=pageTitles[page][0];$('#heading').textContent=pageTitles[page][1];$('#subheading').textContent=pageTitles[page][2];document.dispatchEvent(new CustomEvent('equity-page',{detail:{page}}));}
+const pageTitles={tutorial:['新手教程','看懂数据，再形成自己的判断','从一句白话解释，到公司案例与理解练习。'],terminal:['交易工作台','从这里，开始观察市场','跟随真实行情，管理你的虚拟投资组合。'],positions:['我的持仓','你的投资组合','了解每一笔持仓，以及它对账户的影响。'],history:['交易记录','每一次决策，都有记录','回顾买卖过程，找到属于自己的节奏。'],data:['行情状态','看清数据，也看清边界','查看当前数据来源、覆盖范围和交易可用状态。'],settings:['账户设置','从你选择的起点开始','设置虚拟本金，管理本机账户与备份。']};
+function setPage(value){window.scrollTo({top:0,behavior:"auto"});if(!pageTitles[value])return;page=value;document.body?.classList.toggle('tutorial-mode',value==='tutorial');if(value==='tutorial'&&typeof EquityTutorial!=='undefined')EquityTutorial.render();$$('.view').forEach(v=>v.hidden=v.id!==`view-${page}`);$$('.nav[data-page]').forEach(v=>v.classList.toggle('active',v.dataset.page===page));$('#page-name').textContent=pageTitles[page][0];$('#heading').textContent=pageTitles[page][1];$('#subheading').textContent=pageTitles[page][2];document.dispatchEvent(new CustomEvent('equity-page',{detail:{page}}));}
 function currentTime(){return new Date(Date.now()+serverOffset);}
 function renderClock(){if(!state)return;const now=currentTime();const et=now.toLocaleTimeString('zh-CN',{timeZone:'America/New_York',hour12:false});const bj=now.toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});$('#market-clock').textContent=`纽约 ${et} · 北京 ${bj}`;$('#market-label').textContent=state.market.label+(state.market.earlyClose?' · 提前收盘日':'');$('#market-dot').className=`tiny-dot ${state.market.isOpen?'green':''}`;}
 async function loadState(){state=await api('/api/state');serverOffset=Date.parse(state.serverTime)-Date.now();renderState();}
@@ -119,7 +119,7 @@ function renderFundamentalsDetails(focusKey=null){
   $('#fundamentals-title').textContent=`${symbol} · 指标与解释`;
   $('#fundamentals-context').textContent=etf?'ETF 使用基金规模与费率等信息；公司口径的 PE、EPS、PB 标为不适用。': 'TTM = 过去 12 个月；PB 参考最近财报。财务指标并非实时更新，不会参与模拟成交定价。';
   const openKeys=new Set($$('#fundamentals-details details[open]').map(d=>d.dataset.metricKey));
-  $('#fundamentals-details').innerHTML=keys.map(key=>{const d=metricDefinitions[key],m=data?.metrics[key];return `<details class="metric-detail" data-metric-key="${key}"${focusKey===key||(!focusKey&&openKeys.has(key))?' open':''}><summary><span>${d.label}${['pe','eps'].includes(key)?'（TTM）':''}</span><strong>${escapeHtml(metricValue(key,m))}</strong></summary><p>${d.explanation}</p><p class="metric-provenance">${escapeHtml(m?.reason||m?.period||(fundamentalLoading.has(symbol)?'正在读取…':'来源暂未提供可核验数据'))}${m?.provider?`<br>来源：${escapeHtml(m.provider)}`:''}${m?.provider?` · 读取 ${escapeHtml(date(data.fetchedAt))}`:''}</p></details>`;}).join('');
+  $('#fundamentals-details').innerHTML=keys.map(key=>{const d=metricDefinitions[key],m=data?.metrics[key];return `<details class="metric-detail" data-metric-key="${key}"${focusKey===key||(!focusKey&&openKeys.has(key))?' open':''}><summary><span>${d.label}${['pe','eps'].includes(key)?'（TTM）':''}</span><strong>${escapeHtml(metricValue(key,m))}</strong></summary><p>${d.explanation}</p><button class="text-button" data-learn="${key}">从头学懂这个指标 →</button><p class="metric-provenance">${escapeHtml(m?.reason||m?.period||(fundamentalLoading.has(symbol)?'正在读取…':'来源暂未提供可核验数据'))}${m?.provider?`<br>来源：${escapeHtml(m.provider)}`:''}${m?.provider?` · 读取 ${escapeHtml(date(data.fetchedAt))}`:''}</p></details>`;}).join('');
   $('#fundamentals-sources').innerHTML=data?.sources.map(s=>`<p>${escapeHtml(s.provider)}${s.financialPeriod?` · 最近财报期 ${escapeHtml(s.financialPeriod)}`:''}${s.quoteAsOf?`<br>估值参考行情时间（本地）：${escapeHtml(date(s.quoteAsOf))}`:''}</p>`).join('')||'';
   $('#fundamentals-warning').textContent=data?.warnings.join('；')||fundamentalErrors.get(symbol)||'';
   $('#fundamentals-refresh').disabled=fundamentalLoading.has(symbol);
@@ -179,6 +179,7 @@ document.addEventListener('click',async event=>{
   if(button.dataset.page)setPage(button.dataset.page);
   if(button.dataset.close){closeDialog(button.dataset.close);if(button.dataset.close==='confirm-dialog')confirmation=null;}
   if(button.dataset.metric)openFundamentals(button.dataset.metric);
+  if(button.dataset.learn&&typeof EquityTutorial!=='undefined'){$$('dialog[open]').forEach(d=>d.close());setPage('tutorial');EquityTutorial.open(button.dataset.learn);$('#tutorial-lesson-title')?.focus();}
   if(button.hasAttribute('data-start-guide'))openGuide();
   if(button.dataset.guideAction){closeDialog('guide-dialog');const action=button.dataset.guideAction;if(action==='capital'){if(state?.account.initialCents===null)openCapital();else setPage('settings');}if(action==='search')openSearch();if(action==='metrics'){setPage('terminal');openFundamentals(security.type==='ETF'?'aum':'pe');}if(action==='order'){setPage('terminal');$('#order-value').scrollIntoView({behavior:'smooth',block:'center'});$('#order-value').focus();}}
   if(button.hasAttribute('data-open-capital'))openCapital();
@@ -215,4 +216,5 @@ async function boot(){$('#learning-card').hidden=learningSaved();try{await loadS
 let lastQuoteRefresh=0;
 setInterval(()=>{renderClock();renderOrder();},1000);
 setInterval(async()=>{try{await loadState();if(Date.now()-lastQuoteRefresh>(state.market.isOpen?30000:300000)){lastQuoteRefresh=Date.now();await refreshQuotes();if(page==='terminal')await loadChart();}}catch(e){$('#market-label').textContent='本机服务未连接';}},15000);
+if(typeof EquityTutorial!=='undefined'){let tutorialStorage;try{tutorialStorage=localStorage;}catch{tutorialStorage={getItem:()=>null,setItem(){}};}EquityTutorial.init({$,storage:tutorialStorage,navigate:setPage,observe:s=>selectSymbol(s).catch(e=>toast(e.message))});}
 boot();

@@ -36,7 +36,7 @@ async function startServer({port=17653,directory=defaultDataDir(),market=new Mar
           const csv=rows.map(row=>row.map(v=>{let s=String(v);if(/^[=+@\-\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}).join(',')).join('\r\n');
           res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="E-Equity-trades.csv"'});return res.end('\uFEFF'+csv);
         }
-        const files={'/':'index.html','/app.js':'app.js','/quote-policy.js':'quote-policy.js','/styles.css':'styles.css','/icon.svg':'icon.svg'};
+        const files={'/':'index.html','/app.js':'app.js','/quote-policy.js':'quote-policy.js','/tutorial.js':'tutorial.js','/tutorial.css':'tutorial.css','/styles.css':'styles.css','/icon.svg':'icon.svg'};
         if(!files[route])return json(res,404,{error:'页面不存在'});
         const file=files[route],bytes=await fs.readFile(path.join(__dirname,'public',file));
         res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.js')?'application/javascript; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'image/svg+xml');res.setHeader('Cache-Control','no-cache');return res.end(bytes);

@@ -5,7 +5,7 @@ const desktopVersion=JSON.parse(await fs.readFile(path.join(root,'package.json')
 const phoneVersion=JSON.parse(await fs.readFile('package.json','utf8')).version;
 await fs.mkdir('data',{recursive:true});await fs.mkdir('public',{recursive:true});
 for(const file of ['symbols.json'])await fs.copyFile(path.join(root,'data',file),path.join('data',file));
-for(const file of ['styles.css','icon.svg','icon.png','quote-policy.js'])await fs.copyFile(path.join(root,'public',file),path.join('public',file));
+for(const file of ['styles.css','icon.svg','icon.png','quote-policy.js','tutorial.js','tutorial.css'])await fs.copyFile(path.join(root,'public',file),path.join('public',file));
 const account=await fs.readFile(path.join(root,'lib/account.cjs'),'utf8');
 const pure=account.slice(account.indexOf('function decimal('),account.indexOf('class Account {'));
 await fs.writeFile('public/account-core.js',`'use strict';\n(function(root){\n${pure}\nroot.EquityAccountCore={decimal,money,quantity,priceUnits,cost,emptyState,validSymbol,applyTrade,validateBackup};\n})(globalThis);\n`);
@@ -28,7 +28,7 @@ await fs.writeFile('public/app.js',app);
 let html=await fs.readFile(path.join(root,'public/index.html'),'utf8');
 html=html.replace('width=device-width,initial-scale=1','width=device-width,initial-scale=1,viewport-fit=cover');
 html=html.replace('<title>纸上美股 · E-Equity</title>','<title>纸上美股 · iPhone</title><meta name="theme-color" content="#0b0e14"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="纸上美股"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon.png">');
-html=html.replace('<script src="/app.js" defer>','<link rel="stylesheet" href="/mobile.css?v=1.1.1"><script src="/account-core.js" defer></script><script src="/calendar.js" defer></script><script src="/mobile-api.js" defer></script><script src="/mobile-shell.js?v=1.1.1" defer></script><script src="/mobile-dialogs.js?v=1.1.1" defer></script><script src="/app.js" defer>');
+html=html.replace('<script src="/app.js" defer>','<link rel="stylesheet" href="/mobile.css?v=1.2.0"><script src="/account-core.js" defer></script><script src="/calendar.js" defer></script><script src="/mobile-api.js" defer></script><script src="/mobile-shell.js?v=1.2.0" defer></script><script src="/mobile-dialogs.js?v=1.2.0" defer></script><script src="/app.js" defer>');
 html=html.replace('<span class="paper-badge">PAPER TRADING</span>','<button class="icon-button mobile-search" id="mobile-search" aria-label="搜索股票">⌕</button><span class="paper-badge">PAPER TRADING</span>');
 html=html.replace('<div class="content">','<div class="content"><section class="install-hint" id="install-hint"><img src="/icon.png" alt=""><div><strong>把纸上美股放到主屏幕</strong><small>Safari 分享 → 添加到主屏幕</small></div><button class="icon-button" id="install-dismiss" aria-label="关闭添加提示">×</button></section>');
 html=html.replace('记录只保存在这台电脑','记录只保存在这部手机').replace('v'+desktopVersion,'iPhone v'+phoneVersion);
@@ -36,7 +36,7 @@ html=html.replace('桌面版与同机网页版共用账户。桌面版菜单“�
 html=html.replace('<dd>本机 · 不上传云端</dd>','<dd>手机本地 · 不上传账户</dd>');
 html=html.replace('本机保存 · 无需注册','手机本地保存 · 独立使用');
 html=html.replace('<button class="icon-button" data-close="search-dialog" aria-label="关闭搜索">×</button>','<form class="dialog-close-form" method="dialog"><button class="secondary-button search-cancel" type="submit" data-close="search-dialog" aria-label="关闭搜索">取消</button></form>');
-html=html.replace('</main>',`</main><div class="mobile-trade-shortcuts" id="mobile-trade-shortcuts"><button class="mobile-buy" data-jump-order data-side="buy">买入</button><button class="mobile-sell" data-jump-order data-side="sell">卖出</button></div><nav class="mobile-nav" aria-label="手机导航">${[['terminal','◫','交易'],['positions','▤','持仓'],['history','↔','记录'],['data','◉','行情'],['settings','⚙','账户']].map(([p,icon,label])=>`<button class="nav mobile-tab ${p==='terminal'?'active':''}" data-page="${p}"><span>${icon}</span>${label}</button>`).join('')}</nav>`);
+html=html.replace('</main>',`</main><div class="mobile-trade-shortcuts" id="mobile-trade-shortcuts"><button class="mobile-buy" data-jump-order data-side="buy">买入</button><button class="mobile-sell" data-jump-order data-side="sell">卖出</button></div><nav class="mobile-nav" aria-label="手机导航">${[['terminal','◫','交易'],['positions','▤','持仓'],['history','↔','记录'],['tutorial','◇','教程'],['data','◉','行情'],['settings','⚙','账户']].map(([p,icon,label])=>`<button class="nav mobile-tab ${p==='terminal'?'active':''}" data-page="${p}"><span>${icon}</span>${label}</button>`).join('')}</nav>`);
 await fs.writeFile('public/equity.html',html);
 await fs.writeFile('public/manifest.webmanifest',JSON.stringify({id:'/',name:'纸上美股 E-Equity',short_name:'纸上美股',lang:'zh-CN',start_url:'/',scope:'/',display:'standalone',background_color:'#0b0e14',theme_color:'#0b0e14',icons:[{src:'/icon.png',sizes:'256x256',type:'image/png',purpose:'any'}]},null,2));
 console.log('Synced desktop rules, symbol directory and mobile shell');

@@ -12,6 +12,7 @@ A Chinese-first US stock and ETF paper-trading app for beginners to learn basic 
 - Independent iPhone PWA with on-device IndexedDB accounts.
 - Configurable virtual capital, fractional shares, watchlists, holdings and transaction history.
 - Intraday samples and historical close charts, with provider time and fetch time shown separately.
+- A nine-lesson Chinese beginner classroom, dated Apple/Microsoft/Intel case studies, quizzes, a valuation-assumption exercise and local learning progress. Metric explanations link directly to lessons.
 - Core financial metrics with expandable details, provider/period labels and explicit missing-data states.
 - ETF asset statistics with explicit provider scope and expense ratios, a four-step beginner guide and order-entry tips.
 - New York trading dates, DST, holidays and early closes for 2026–2028.
